@@ -49,7 +49,7 @@ function setupSocket(io) {
 
       try {
         const inserted = await MessageModel.sendDirectMessage(userId, receiverId, content.trim());
-        
+
         // Get full message data including sender details
         const result = await MessageModel.getMessageWithSenderDetails(inserted.rows[0].id);
         const fullMessage = result.rows[0];
@@ -87,7 +87,7 @@ function setupSocket(io) {
         }
 
         const inserted = await MessageModel.sendGroupMessage(userId, groupId, content.trim());
-        
+
         // Get sender details to match expected format
         const senderResult = await UserModel.findById(userId);
         const sender = senderResult.rows[0];
@@ -135,7 +135,7 @@ function setupSocket(io) {
       }
     });
 
-    // Mark messages as read
+    // Mark direct messages as read
     socket.on('mark_read', async ({ senderId }) => {
       if (!senderId) return;
       try {
@@ -146,6 +146,24 @@ function setupSocket(io) {
         }
       } catch (err) {
         console.error('Mark read error:', err);
+      }
+    });
+
+    // BUG-1 fix: Mark group messages as read using message_read_receipts.
+    // Emits 'group_messages_read' back to the user so sidebar can clear count.
+    socket.on('mark_group_read', async ({ groupId }) => {
+      if (!groupId) return;
+      try {
+        // Verify membership before marking
+        const member = await GroupModel.checkMembership(groupId, userId);
+        if (member.rows.length === 0) return;
+
+        await MessageModel.markGroupMessagesRead(groupId, userId);
+
+        // Notify the sender's own socket so sidebar clears the unread badge
+        socket.emit('group_messages_read', { groupId, byUserId: userId });
+      } catch (err) {
+        console.error('Mark group read error:', err);
       }
     });
 

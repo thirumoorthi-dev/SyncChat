@@ -60,6 +60,10 @@ export default function ChatWindow({ chat, onBack }) {
       let res;
       if (isGroup) {
         res = await api.get(`/groups/${chat.id}/messages`);
+        // BUG-1 fix: emit mark_group_read so the server inserts read receipts
+        // via message_read_receipts table, and fires group_messages_read back
+        // to the sidebar to clear the unread badge.
+        socket?.emit('mark_group_read', { groupId: chat.id });
       } else {
         res = await api.get(`/messages/direct/${chat.id}`);
         socket?.emit('mark_read', { senderId: chat.id });
@@ -118,6 +122,8 @@ export default function ChatWindow({ chat, onBack }) {
           if (prev.find(m => m.id === message.id)) return prev;
           return [...prev, message];
         });
+        // BUG-1 fix: mark the new message as read immediately since the chat is open
+        socket?.emit('mark_group_read', { groupId: chat.id });
       }
     };
     const handleTypingStart = (data) => {

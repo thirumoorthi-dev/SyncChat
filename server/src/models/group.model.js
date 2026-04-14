@@ -50,7 +50,9 @@ const GroupModel = {
   },
 
   /**
-   * Get all groups a user is a member of.
+   * Get all groups a user is a member of with accurate unread counts.
+   * BUG-1 fix: unread_count now uses message_read_receipts for per-user tracking
+   * instead of the shared is_read flag which was never set for group messages.
    */
   getUserGroups(userId) {
     return pool.query(
@@ -65,8 +67,14 @@ const GroupModel = {
           SELECT m.created_at FROM messages m WHERE m.group_id = g.id ORDER BY m.created_at DESC LIMIT 1
         ) AS last_message_time,
         (
-          SELECT COUNT(*) FROM messages m
-          WHERE m.group_id = g.id AND m.sender_id != $1 AND m.is_read = FALSE
+          SELECT COUNT(*)
+          FROM messages m
+          WHERE m.group_id = g.id
+            AND m.sender_id != $1
+            AND NOT EXISTS (
+              SELECT 1 FROM message_read_receipts r
+              WHERE r.message_id = m.id AND r.user_id = $1
+            )
         ) AS unread_count
        FROM groups g
        JOIN group_members gm ON gm.group_id = g.id
@@ -142,7 +150,7 @@ const GroupModel = {
       [groupId, userId]
     );
   },
-  
+
   /**
    * Get all group IDs for a user (used for joining socket rooms).
    */
@@ -151,7 +159,7 @@ const GroupModel = {
       'SELECT group_id FROM group_members WHERE user_id = $1',
       [userId]
     );
-  }
+  },
 };
 
 module.exports = GroupModel;

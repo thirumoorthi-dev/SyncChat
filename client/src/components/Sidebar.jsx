@@ -22,8 +22,9 @@ export default function Sidebar({ activeChat, onSelectChat }) {
         api.get('/users/conversations'),
         api.get('/groups'),
       ]);
-      setConversations(convRes.data);
-      setGroups(groupRes.data);
+      // BUG-4 fix: normalize unread_count to number consistently
+      setConversations(convRes.data.map(c => ({ ...c, unread_count: parseInt(c.unread_count || '0', 10) })));
+      setGroups(groupRes.data.map(g => ({ ...g, unread_count: parseInt(g.unread_count || '0', 10) })));
     } catch (err) {
       console.error('Load conversations error:', err);
     }
@@ -39,39 +40,68 @@ export default function Sidebar({ activeChat, onSelectChat }) {
         const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
         const exists = prev.find(c => c.id === otherId);
         if (exists) {
-          return prev.map(c => c.id === otherId ? {
-            ...c,
-            last_message: msg.content,
-            last_message_time: msg.created_at,
-            last_message_sender_id: msg.sender_id,
-            unread_count: msg.sender_id !== user.id
-              ? (parseInt(c.unread_count || 0) + 1).toString()
-              : c.unread_count,
-          } : c).sort((a, b) =>
+          return prev.map(c => {
+            if (c.id !== otherId) return c;
+            // BUG-3 fix: don't increment unread if this is the currently active DM
+            const isActiveChat = activeChat?.type === 'direct' && activeChat?.id === otherId;
+            return {
+              ...c,
+              last_message: msg.content,
+              last_message_time: msg.created_at,
+              last_message_sender_id: msg.sender_id,
+              // BUG-4 fix: keep unread_count as number
+              unread_count: (msg.sender_id !== user.id && !isActiveChat)
+                ? (c.unread_count || 0) + 1
+                : c.unread_count,
+            };
+          }).sort((a, b) =>
             new Date(b.last_message_time) - new Date(a.last_message_time)
           );
         }
+        // New conversation not yet in list — reload
         loadConversations();
         return prev;
       });
     };
 
     const handleNewGroupMessage = ({ groupId, message }) => {
-      setGroups(prev => prev.map(g => g.id === parseInt(groupId) ? {
-        ...g,
-        last_message: message.content,
-        last_message_time: message.created_at,
-        unread_count: message.sender_id !== user.id
-          ? (parseInt(g.unread_count || 0) + 1).toString()
-          : g.unread_count,
-      } : g).sort((a, b) =>
+      setGroups(prev => prev.map(g => {
+        if (g.id !== parseInt(groupId)) return g;
+        // BUG-2 fix: don't increment unread if this group is currently open
+        const isActiveGroup = activeChat?.type === 'group' && activeChat?.id === parseInt(groupId);
+        return {
+          ...g,
+          last_message: message.content,
+          last_message_time: message.created_at,
+          // BUG-4 fix: keep unread_count as number
+          unread_count: (message.sender_id !== user.id && !isActiveGroup)
+            ? (g.unread_count || 0) + 1
+            : g.unread_count,
+        };
+      }).sort((a, b) =>
         new Date(b.last_message_time || 0) - new Date(a.last_message_time || 0)
+      ));
+    };
+
+    // BUG-5 fix: listen to messages_read to clear DM unread count in real-time
+    const handleMessagesRead = ({ byUserId }) => {
+      setConversations(prev => prev.map(c =>
+        c.id === byUserId ? { ...c, unread_count: 0 } : c
+      ));
+    };
+
+    // BUG-1 fix: listen to group_messages_read to clear group unread count in real-time
+    const handleGroupMessagesRead = ({ groupId }) => {
+      setGroups(prev => prev.map(g =>
+        g.id === parseInt(groupId) ? { ...g, unread_count: 0 } : g
       ));
     };
 
     socket.on('new_message', handleNewMessage);
     socket.on('message_sent', handleNewMessage);
     socket.on('new_group_message', handleNewGroupMessage);
+    socket.on('messages_read', handleMessagesRead);
+    socket.on('group_messages_read', handleGroupMessagesRead);
     socket.on('user_online', ({ userId, isOnline }) => {
       setConversations(prev => prev.map(c =>
         c.id === userId ? { ...c, is_online: isOnline } : c
@@ -82,16 +112,18 @@ export default function Sidebar({ activeChat, onSelectChat }) {
       socket.off('new_message', handleNewMessage);
       socket.off('message_sent', handleNewMessage);
       socket.off('new_group_message', handleNewGroupMessage);
+      socket.off('messages_read', handleMessagesRead);
+      socket.off('group_messages_read', handleGroupMessagesRead);
       socket.off('user_online');
     };
-  }, [socket, user, loadConversations]);
+  }, [socket, user, activeChat, loadConversations]);
 
   const handleSelectUser = (u) => {
     setShowModal(false);
     onSelectChat({ ...u, type: 'direct' });
     setConversations(prev => {
       if (prev.find(c => c.id === u.id)) return prev;
-      return [{ ...u, last_message: null, last_message_time: null, unread_count: '0', type: 'direct' }, ...prev];
+      return [{ ...u, last_message: null, last_message_time: null, unread_count: 0, type: 'direct' }, ...prev];
     });
   };
 
@@ -100,7 +132,8 @@ export default function Sidebar({ activeChat, onSelectChat }) {
     try {
       const res = await api.post('/groups', { name, memberIds });
       const group = res.data;
-      setGroups(prev => [group, ...prev]);
+      // BUG-4 fix: normalize new group unread_count to number
+      setGroups(prev => [{ ...group, unread_count: 0 }, ...prev]);
       onSelectChat({ ...group, type: 'group' });
       socket?.emit('join_group', group.id);
     } catch (err) {
@@ -109,10 +142,11 @@ export default function Sidebar({ activeChat, onSelectChat }) {
   };
 
   const handleSelectChat = (chat) => {
+    // BUG-4 fix: set unread to number 0
     if (chat.type === 'direct') {
-      setConversations(prev => prev.map(c => c.id === chat.id ? { ...c, unread_count: '0' } : c));
+      setConversations(prev => prev.map(c => c.id === chat.id ? { ...c, unread_count: 0 } : c));
     } else {
-      setGroups(prev => prev.map(g => g.id === chat.id ? { ...g, unread_count: '0' } : g));
+      setGroups(prev => prev.map(g => g.id === chat.id ? { ...g, unread_count: 0 } : g));
     }
     onSelectChat(chat);
   };
@@ -130,7 +164,8 @@ export default function Sidebar({ activeChat, onSelectChat }) {
       )
     : allChats;
 
-  const totalUnread = allChats.reduce((sum, c) => sum + parseInt(c.unread_count || 0), 0);
+  // BUG-4 fix: unread_count is now always a number, no need for parseInt
+  const totalUnread = allChats.reduce((sum, c) => sum + (c.unread_count || 0), 0);
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--panel)', borderRight: '1px solid var(--border)' }}>

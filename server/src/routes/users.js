@@ -30,16 +30,12 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get user's conversations (direct chats)
+// BUG-9 fix: sorting is now done correctly in SQL via subquery in getConversations().
+// The redundant JS sort is removed.
 router.get('/conversations', authenticateToken, async (req, res) => {
   try {
     const result = await UserModel.getConversations(req.user.id);
-
-    // Sort by last message time
-    const sorted = result.rows.sort((a, b) =>
-      new Date(b.last_message_time) - new Date(a.last_message_time)
-    );
-
-    res.json(sorted);
+    res.json(result.rows);
   } catch (error) {
     console.error('Get conversations error:', error);
     res.status(500).json({ message: 'Server error' });

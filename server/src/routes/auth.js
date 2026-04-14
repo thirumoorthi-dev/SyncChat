@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const UserModel = require('../models/user.model');
+const { authenticateToken } = require('../middleware/auth');
 
 // Register
 router.post('/register', async (req, res) => {
@@ -24,7 +25,7 @@ router.post('/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    
+
     const result = await UserModel.create({ username, email, passwordHash });
     const user = result.rows[0];
 
@@ -79,21 +80,15 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Get current user
-router.get('/me', async (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) return res.status(401).json({ message: 'No token' });
-
+// BUG-8 fix: Use authenticateToken middleware instead of duplicating JWT verification logic
+router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const result = await UserModel.findById(decoded.id);
-    
+    const result = await UserModel.findById(req.user.id);
     if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
     res.json(result.rows[0]);
-  } catch {
-    res.status(403).json({ message: 'Invalid token' });
+  } catch (error) {
+    console.error('Get me error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

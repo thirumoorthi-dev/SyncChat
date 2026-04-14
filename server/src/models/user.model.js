@@ -109,30 +109,37 @@ const UserModel = {
 
   /**
    * Get all direct conversations for a user, with last message & unread count.
+   * BUG-9 fix: wrapped in a subquery so the outer ORDER BY last_message_time DESC
+   * works correctly. The inner DISTINCT ON (other_user.id) picks the latest
+   * message per other user, and the outer query sorts all conversations.
    */
   getConversations(userId) {
     return pool.query(
-      `SELECT DISTINCT ON (other_user.id)
-         other_user.id,
-         other_user.username,
-         other_user.email,
-         other_user.avatar_color,
-         other_user.is_online,
-         other_user.last_seen,
-         m.content            AS last_message,
-         m.created_at         AS last_message_time,
-         m.sender_id          AS last_message_sender_id,
-         (
-           SELECT COUNT(*) FROM messages
-           WHERE receiver_id = $1 AND sender_id = other_user.id AND is_read = FALSE
-         ) AS unread_count
-       FROM users other_user
-       JOIN messages m ON (
-         (m.sender_id = $1 AND m.receiver_id = other_user.id) OR
-         (m.receiver_id = $1 AND m.sender_id = other_user.id)
-       )
-       WHERE other_user.id != $1 AND m.group_id IS NULL
-       ORDER BY other_user.id, m.created_at DESC`,
+      `SELECT *
+       FROM (
+         SELECT DISTINCT ON (other_user.id)
+           other_user.id,
+           other_user.username,
+           other_user.email,
+           other_user.avatar_color,
+           other_user.is_online,
+           other_user.last_seen,
+           m.content            AS last_message,
+           m.created_at         AS last_message_time,
+           m.sender_id          AS last_message_sender_id,
+           (
+             SELECT COUNT(*) FROM messages
+             WHERE receiver_id = $1 AND sender_id = other_user.id AND is_read = FALSE AND group_id IS NULL
+           ) AS unread_count
+         FROM users other_user
+         JOIN messages m ON (
+           (m.sender_id = $1 AND m.receiver_id = other_user.id) OR
+           (m.receiver_id = $1 AND m.sender_id = other_user.id)
+         )
+         WHERE other_user.id != $1 AND m.group_id IS NULL
+         ORDER BY other_user.id, m.created_at DESC
+       ) conversations
+       ORDER BY last_message_time DESC`,
       [userId]
     );
   },

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const GroupModel = require('../models/group.model');
+const MessageModel = require('../models/message.model');
 const { authenticateToken } = require('../middleware/auth');
 
 // Create group
@@ -16,7 +17,7 @@ router.post('/', authenticateToken, async (req, res) => {
       name: name.trim(),
       description,
       creatorId: req.user.id,
-      memberIds
+      memberIds,
     });
 
     // Return group with members
@@ -41,6 +42,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get group messages
+// BUG-7 fix: this route is defined BEFORE /:groupId to avoid shadowing
 router.get('/:groupId/messages', authenticateToken, async (req, res) => {
   const { groupId } = req.params;
   const limit = parseInt(req.query.limit) || 50;
@@ -55,6 +57,10 @@ router.get('/:groupId/messages', authenticateToken, async (req, res) => {
     }
 
     const result = await GroupModel.getGroupMessages(groupId, limit, offset);
+
+    // Also mark messages as read via REST (fallback for when socket is not used)
+    await MessageModel.markGroupMessagesRead(groupId, req.user.id);
+
     res.json(result.rows.reverse());
   } catch (error) {
     console.error('Get group messages error:', error);
@@ -62,7 +68,26 @@ router.get('/:groupId/messages', authenticateToken, async (req, res) => {
   }
 });
 
+// BUG-1 fix: REST endpoint to mark all group messages as read
+router.post('/:groupId/read', authenticateToken, async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    const member = await GroupModel.checkMembership(groupId, req.user.id);
+    if (member.rows.length === 0) {
+      return res.status(403).json({ message: 'Not a member of this group' });
+    }
+
+    await MessageModel.markGroupMessagesRead(groupId, req.user.id);
+    res.json({ message: 'Messages marked as read' });
+  } catch (error) {
+    console.error('Mark group read error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get group info with members
+// BUG-7 fix: /:groupId is now AFTER /:groupId/messages and /:groupId/read
 router.get('/:groupId', authenticateToken, async (req, res) => {
   const { groupId } = req.params;
 

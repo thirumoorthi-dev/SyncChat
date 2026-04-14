@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
@@ -6,49 +6,52 @@ const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const { token } = useAuth();
-  const socketRef = useRef(null);
+  // BUG-6 fix: store socket in state (not just a ref) so children always
+  // receive the live socket instance and re-render when it changes.
+  const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     if (!token) {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-        setIsConnected(false);
-      }
+      // Clean up existing socket when token is removed (logout)
+      setSocket(prev => {
+        if (prev) prev.disconnect();
+        return null;
+      });
+      setIsConnected(false);
       return;
     }
 
-    const socket = io('/', {
+    const newSocket = io('/', {
       auth: { token },
       transports: ['websocket', 'polling'],
     });
 
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
+    newSocket.on('connect', () => {
       setIsConnected(true);
-      console.log('Socket connected');
+      console.log('Socket connected:', newSocket.id);
     });
 
-    socket.on('disconnect', () => {
+    newSocket.on('disconnect', () => {
       setIsConnected(false);
       console.log('Socket disconnected');
     });
 
-    socket.on('connect_error', (err) => {
+    newSocket.on('connect_error', (err) => {
       console.error('Socket connection error:', err.message);
     });
 
+    setSocket(newSocket);
+
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      newSocket.disconnect();
+      setSocket(null);
       setIsConnected(false);
     };
   }, [token]);
 
   return (
-    <SocketContext.Provider value={{ socket: socketRef.current, isConnected }}>
+    <SocketContext.Provider value={{ socket, isConnected }}>
       {children}
     </SocketContext.Provider>
   );

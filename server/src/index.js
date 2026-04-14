@@ -3,6 +3,8 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 const initDatabase = require('./config/initDb');
 
 const authRoutes = require('./routes/auth');
@@ -29,6 +31,34 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Swagger UI — available at /api/docs
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: 'SyncChat API Docs',
+  customCss: `
+    .swagger-ui .topbar { background: linear-gradient(135deg, #128C7E, #25D366); }
+    .swagger-ui .topbar-wrapper img { display: none; }
+    .swagger-ui .topbar-wrapper::before {
+      content: '💬 SyncChat API';
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      font-family: Inter, sans-serif;
+    }
+  `,
+  swaggerOptions: {
+    persistAuthorization: true,
+    docExpansion: 'list',
+    filter: true,
+    displayRequestDuration: true,
+  },
+}));
+
+// Swagger JSON spec endpoint
+app.get('/api/docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
@@ -49,6 +79,7 @@ async function start() {
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`WebSocket ready on port ${PORT}`);
+    console.log(`Swagger API docs: http://localhost:${PORT}/api/docs`);
   });
 }
 
