@@ -1,0 +1,244 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Font fallback  ────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Reset ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── CSS Variables – Light Mode ───────────────────────────────── */
+:root {
+  --bg:          #EFEAE2;
+  --panel:       #F0F2F5;
+  --hover:       #F5F6F6;
+  --border:      #E9EDEF;
+  --text:        #111B21;
+  --subtext:     #667781;
+  --sent:        #D9FDD3;
+  --received:    #FFFFFF;
+  --teal:        #128C7E;
+  --green:       #25D366;
+  --dark:        #075E54;
+  --active-bg:   #F0F2F5;
+  --active-bar:  #128C7E;
+  --input-bg:    #FFFFFF;
+  --modal-bg:    #FFFFFF;
+  --overlay:     rgba(0,0,0,0.45);
+  --shadow-msg:  0 1px 2px rgba(0,0,0,0.13);
+  --scrollbar:   #ccc;
+}
+
+/* ── CSS Variables – Dark Mode ────────────────────────────────── */
+.dark {
+  --bg:          #0B141A;
+  --panel:       #202C33;
+  --hover:       #2A3942;
+  --border:      #313D45;
+  --text:        #E9EDEF;
+  --subtext:     #8696A0;
+  --sent:        #005C4B;
+  --received:    #202C33;
+  --teal:        #00A884;
+  --green:       #25D366;
+  --dark:        #008069;
+  --active-bg:   #2A3942;
+  --active-bar:  #00A884;
+  --input-bg:    #2A3942;
+  --modal-bg:    #233138;
+  --overlay:     rgba(0,0,0,0.6);
+  --shadow-msg:  0 1px 3px rgba(0,0,0,0.4);
+  --scrollbar:   #374045;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────── */
+::-webkit-scrollbar          { width: 5px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: var(--scrollbar); border-radius: 4px; transition: background .2s; }
+::-webkit-scrollbar-thumb:hover { background: var(--subtext); }
+
+/* ── Utility: Glass Card ──────────────────────────────────────── */
+.glass-card {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* ── Utility: Shimmer Skeleton ────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--panel) 25%, var(--hover) 50%, var(--panel) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+/* ── Message Bubble Base ──────────────────────────────────────── */
+.message-bubble { animation: fadeInUp 0.18s ease-out; }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Bubble tails */
+.bubble-sent {
+  background: var(--sent);
+  border-radius: 8px 8px 0 8px;
+  box-shadow: var(--shadow-msg);
+  position: relative;
+}
+.bubble-sent::after {
+  content: '';
+  position: absolute;
+  bottom: 0; right: -8px;
+  border-width: 8px 0 0 8px;
+  border-style: solid;
+  border-color: transparent transparent transparent var(--sent);
+}
+
+.bubble-received {
+  background: var(--received);
+  border-radius: 8px 8px 8px 0;
+  box-shadow: var(--shadow-msg);
+  position: relative;
+}
+.bubble-received::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: -8px;
+  border-width: 8px 8px 0 0;
+  border-style: solid;
+  border-color: transparent var(--received) transparent transparent;
+}
+
+/* ── Typing Indicator ─────────────────────────────────────────── */
+.typing-dot { animation: bounceDot 1.2s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes bounceDot {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%            { transform: translateY(-5px); }
+}
+
+/* ── Slide-in for conversation items ─────────────────────────── */
+.slide-item { animation: slideLeft 0.22s ease-out; }
+@keyframes slideLeft {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Pop-in for modals ────────────────────────────────────────── */
+.pop-in { animation: popIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.88) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Pulse ring for online indicator ─────────────────────────── */
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: var(--green);
+  opacity: 0;
+  animation: pulseRing 2s ease-out infinite;
+}
+@keyframes pulseRing {
+  0%   { transform: scale(1); opacity: 0.6; }
+  70%  { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* ── Chat background pattern ─────────────────────────────────── */
+.chat-bg {
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='2' fill='%23000'/%3E%3C/svg%3E");
+}
+.dark .chat-bg {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' opacity='0.06'%3E%3Ccircle cx='30' cy='30' r='2' fill='%23fff'/%3E%3C/svg%3E");
+}
+
+/* ── Input auto-grow ─────────────────────────────────────────── */
+.auto-grow { field-sizing: content; max-height: 8rem; }
+
+/* ── Floating label ──────────────────────────────────────────── */
+.float-label-group { position: relative; }
+.float-label-group input:focus + label,
+.float-label-group input:not(:placeholder-shown) + label {
+  top: -10px;
+  font-size: 0.7rem;
+  color: var(--teal);
+}
+.float-label-group label {
+  position: absolute;
+  top: 12px; left: 0;
+  font-size: 0.875rem;
+  color: var(--subtext);
+  pointer-events: none;
+  transition: all .18s ease;
+}
+
+/* ── Gradient button ─────────────────────────────────────────── */
+.btn-primary {
+  background: linear-gradient(135deg, var(--teal) 0%, var(--dark) 100%);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: opacity .2s, transform .15s;
+}
+.btn-primary:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Date separator ──────────────────────────────────────────── */
+.date-sep {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.date-sep::before, .date-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Scroll-to-bottom FAB ────────────────────────────────────── */
+.scroll-fab {
+  position: absolute;
+  right: 16px; bottom: 80px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  animation: popIn .2s ease;
+}
+.scroll-fab:hover { transform: scale(1.08); box-shadow: 0 4px 12px rgba(0,0,0,0.22); }
+
+/* ── Reaction hover strip ────────────────────────────────────── */
+.reaction-strip {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+.message-bubble:hover .reaction-strip { opacity: 1; pointer-events: auto; }

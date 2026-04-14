@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+dist/
+build/
+*.log
+.DS_Store
+.thumbs.db
+Thumbs.db
+
+# Orchids platform files (internal tooling - not for repo)
+.orchids/
