@@ -1,5 +1,5 @@
 export interface User {
-  id: number;
+  id: string;
   username: string;
   email: string;
   display_name?: string;
@@ -15,18 +15,18 @@ export interface User {
 export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'file' | 'location' | 'sticker';
 
 export interface Reaction {
-  id: number;
-  message_id: number;
-  user_id: number;
+  id: string;
+  message_id: string;
+  user_id: string;
   reaction: string;
   created_at: string;
 }
 
 export interface Message {
-  id: number;
-  sender_id: number;
-  receiver_id?: number;
-  group_id?: number;
+  id: string;
+  sender_id: string;
+  receiver_id?: string;
+  group_id?: string;
   content: string;
   message_type: MessageType;
   created_at: string;
@@ -37,30 +37,38 @@ export interface Message {
   deleted_at?: string;
   is_edited: boolean;
   edited_at?: string;
-  replied_to_id?: number;
+  replied_to_id?: string | null;
   parent_message_content?: string;
-  reactions?: Reaction[];
+  parent_message_sender?: string;
+  media_url?: string | null;
+  media_mime_type?: string | null;
+  media_size_bytes?: string | number | null;
+  media_filename?: string | null;
+  media_thumbnail_url?: string | null;
+  reactions?: any[];
 }
 
 export interface Group {
-  id: number;
+  id: string;
   name: string;
   description?: string;
-  created_by: number;
+  created_by: string;
   avatar_color: string;
   avatar_url?: string;
   unread_count: number;
   last_message?: string;
   last_message_time?: string;
-  last_message_sender_id?: number;
+  last_message_sender_id?: string;
   created_at: string;
+  is_blocked: boolean;
 }
 
 export interface Conversation extends User {
   last_message?: string;
   last_message_time?: string;
-  last_message_sender_id?: number;
+  last_message_sender_id?: string;
   unread_count: number;
+  is_blocked: boolean;
 }
 
 export type ChatItem = 

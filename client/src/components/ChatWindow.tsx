@@ -46,13 +46,21 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(true);
   const [typing, setTyping] = useState<{ username: string; userId: number } | null>(null);
   const [chatInfo, setChatInfo] = useState<ChatItem>(chat);
   const [showScrollFab, setShowScrollFab] = useState<boolean>(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef<boolean>(false);
+  const prevScrollHeightRef = useRef<number>(0);
 
   const isGroup = chat.type === 'group';
 
@@ -60,24 +68,48 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
-  const loadMessages = useCallback(async () => {
-    setLoading(true);
+  const loadMessages = useCallback(async (beforeId: number | null = null) => {
+    if (beforeId) setLoadingMore(true);
+    else setLoading(true);
+
     try {
+      const params = { limit: 50, beforeId };
       let res;
       if (isGroup) {
-        res = await api.get(`/groups/${chat.id}/messages`);
-        socket?.emit('mark_group_read', { groupId: chat.id });
+        res = await api.get(`/groups/${chat.id}/messages`, { params });
+        if (!beforeId) socket?.emit('mark_group_read', { groupId: chat.id });
       } else {
-        res = await api.get(`/messages/direct/${chat.id}`);
-        socket?.emit('mark_read', { senderId: chat.id });
+        res = await api.get(`/messages/direct/${chat.id}`, { params });
+        if (!beforeId) socket?.emit('mark_read', { senderId: chat.id });
       }
-      setMessages(res.data);
+
+      if (res.data.length < 50) setHasMore(false);
+      else setHasMore(true);
+
+      if (beforeId) {
+        // Remember scroll height before prepending
+        if (messagesContainerRef.current) {
+          prevScrollHeightRef.current = messagesContainerRef.current.scrollHeight;
+        }
+        setMessages(prev => [...res.data, ...prev]);
+      } else {
+        setMessages(res.data);
+      }
     } catch (err) {
       console.error('Load messages error:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [chat.id, isGroup, socket]);
+
+  // Adjust scroll after loading more
+  useEffect(() => {
+    if (loadingMore && messagesContainerRef.current && prevScrollHeightRef.current) {
+      const newScrollHeight = messagesContainerRef.current.scrollHeight;
+      messagesContainerRef.current.scrollTop = newScrollHeight - prevScrollHeightRef.current;
+    }
+  }, [messages, loadingMore]);
 
   useEffect(() => {
     loadMessages();
@@ -94,12 +126,22 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
     scrollToBottom('auto');
   }, [messages, typing]);
 
-  // Scroll FAB visibility
+  // Scroll handling
   const handleScroll = () => {
     const el = messagesContainerRef.current;
     if (!el) return;
+
+    // Show FAB
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     setShowScrollFab(distFromBottom > 200);
+
+    // Load more if at top
+    if (el.scrollTop < 100 && hasMore && !loadingMore && !loading) {
+      const oldestId = messages[0]?.id;
+      if (oldestId) {
+        loadMessages(oldestId);
+      }
+    }
   };
 
   useEffect(() => {
@@ -107,7 +149,10 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
     const handleNewMessage = (msg: Message) => {
       if (!isGroup && (msg.sender_id === chat.id || msg.receiver_id === chat.id)) {
-        setMessages(prev => [...prev, msg]);
+        setMessages(prev => {
+          if (prev.find(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
         socket.emit('mark_read', { senderId: msg.sender_id });
       }
     };
@@ -147,6 +192,15 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
         setChatInfo(prev => ({ ...prev, is_online: isOnline }));
       }
     };
+    const handleMessageEdited = ({ messageId, content }: { messageId: number; content: string }) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content, is_edited: true } : m));
+    };
+    const handleMessageDeleted = ({ messageId }: { messageId: number }) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: '', is_deleted: true } : m));
+    };
+    const handleReactionUpdated = ({ messageId, reactions }: { messageId: number; reactions: any[] }) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
+    };
 
     socket.on('new_message', handleNewMessage);
     socket.on('message_sent', handleMessageSent);
@@ -155,6 +209,9 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
     socket.on('typing_stop', handleTypingStop);
     socket.on('messages_read', handleMessagesRead);
     socket.on('user_online', handleUserOnline);
+    socket.on('message_edited', handleMessageEdited);
+    socket.on('message_deleted', handleMessageDeleted);
+    socket.on('reaction_updated', handleReactionUpdated);
 
     return () => {
       socket.off('new_message', handleNewMessage);
@@ -164,6 +221,9 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
       socket.off('typing_stop', handleTypingStop);
       socket.off('messages_read', handleMessagesRead);
       socket.off('user_online', handleUserOnline);
+      socket.off('message_edited', handleMessageEdited);
+      socket.off('message_deleted', handleMessageDeleted);
+      socket.off('reaction_updated', handleReactionUpdated);
     };
   }, [socket, chat.id, chat.type, isGroup, user]);
 
@@ -180,30 +240,90 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
     }, 1500);
   };
 
-  const sendMessage = (e?: React.FormEvent) => {
+  const sendMessage = (e?: React.FormEvent, media: any = null) => {
     e?.preventDefault();
-    if (!input.trim() || !socket) return;
+    if (!input.trim() && !media) return;
+    if (!socket) return;
     const content = input.trim();
+
+    if (editingMessage && !media) {
+      socket.emit('edit_message', { messageId: editingMessage.id, content }, (res: any) => {
+        if (res.error) console.error(res.error);
+        else setEditingMessage(null);
+      });
+      setInput('');
+      return;
+    }
+
+    const payload: any = { content: content || null };
+    if (replyingTo) payload.repliedToId = replyingTo.id;
+    if (media) payload.media = media;
+
     setInput('');
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     isTypingRef.current = false;
     socket.emit('typing_stop', isGroup ? { groupId: chat.id } : { receiverId: chat.id });
+
     if (isGroup) {
-      socket.emit('send_group_message', { groupId: chat.id, content }, (res: { error?: string }) => {
+      socket.emit('send_group_message', { ...payload, groupId: chat.id }, (res: { error?: string }) => {
         if (res?.error) console.error(res.error);
+        else setReplyingTo(null);
       });
     } else {
-      socket.emit('send_message', { receiverId: chat.id, content }, (res: { error?: string; message?: Message }) => {
+      socket.emit('send_message', { ...payload, receiverId: chat.id }, (res: { error?: string; message?: Message }) => {
         if (res?.error) {
           console.error(res.error);
-        } else if (res?.message) {
-          setMessages(prev => {
-            if (prev.find(m => m.id === res.message!.id)) return prev;
-            return [...prev, res.message!];
-          });
+        } else {
+          setReplyingTo(null);
         }
       });
     }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      sendMessage(undefined, res.data);
+    } catch (err) {
+      console.error('File upload failed:', err);
+      alert('Failed to upload file');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleReply = (msg: Message) => {
+    setEditingMessage(null);
+    setReplyingTo(msg);
+    document.getElementById('message-input')?.focus();
+  };
+
+  const handleEdit = (msg: Message) => {
+    setReplyingTo(null);
+    setEditingMessage(msg);
+    setInput(msg.content);
+    document.getElementById('message-input')?.focus();
+  };
+
+  const handleDelete = (msg: Message) => {
+    if (window.confirm('Delete this message for everyone?')) {
+      socket?.emit('delete_message', { messageId: msg.id });
+    }
+  };
+
+  const handleReaction = (msg: Message, emoji: string) => {
+    const existing = msg.reactions?.find(r => r.reaction === emoji && r.user_id === user?.id);
+    socket?.emit('toggle_reaction', { messageId: msg.id, reaction: emoji, isRemoving: !!existing });
   };
 
 
@@ -276,7 +396,14 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
               <SkeletonBubble key={i} right={i % 3 === 0} />
             ))}
           </div>
-        ) : messages.length === 0 ? (
+        ) : (
+          <>
+            {loadingMore && (
+              <div className="flex justify-center py-4">
+                <div className="w-6 h-6 border-2 border-[var(--teal)] border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div
               className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
@@ -314,11 +441,17 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
                   message={msg}
                   isOwn={msg.sender_id === (user as User).id}
                   showSender={showSender}
+                  onReply={handleReply}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onReaction={handleReaction}
                 />
               );
             })}
             {typing && <TypingIndicator username={isGroup ? typing.username : null} />}
             <div ref={messagesEndRef} />
+          </>
+            )}
           </>
         )}
 
@@ -337,44 +470,91 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
       {/* ── Input Bar ── */}
       <div
-        className="flex items-end gap-2 px-4 py-3 flex-shrink-0"
+        className="flex flex-col flex-shrink-0"
         style={{ backgroundColor: 'var(--panel)', borderTop: '1px solid var(--border)' }}
       >
-        <div
-          className="flex-1 flex items-end gap-2 rounded-2xl px-4 py-2"
-          style={{ backgroundColor: 'var(--input-bg)', border: '1px solid var(--border)' }}
-        >
-          <textarea
-            id="message-input"
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message"
-            rows={1}
-            className="flex-1 outline-none text-sm resize-none max-h-32 overflow-y-auto bg-transparent leading-relaxed"
-            style={{ color: 'var(--text)', lineHeight: '1.5' }}
-          />
-        </div>
+        {/* Reply/Edit Preview */}
+        {(replyingTo || editingMessage) && (
+          <div className="flex items-center justify-between px-4 py-2 bg-[var(--hover)] border-b border-[var(--border)] animate-in slide-in-from-bottom-2 duration-200">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-1 h-8 bg-[var(--teal)] rounded-full" />
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--teal)' }}>
+                  {editingMessage ? 'Editing Message' : `Replying to ${replyingTo?.sender_username}`}
+                </span>
+                <span className="text-xs truncate opacity-70" style={{ color: 'var(--text)' }}>
+                  {editingMessage ? editingMessage.content : replyingTo?.content}
+                </span>
+              </div>
+            </div>
+            <button 
+              onClick={() => { setReplyingTo(null); setEditingMessage(null); if (editingMessage) setInput(''); }} 
+              className="p-1.5 rounded-full hover:bg-[var(--border)] transition-colors"
+            >
+              <svg className="w-4 h-4" style={{ color: 'var(--subtext)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
 
-        <button
-          id="send-btn"
-          onClick={() => sendMessage()}
-          disabled={!input.trim()}
-          className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 ${
-            input.trim() ? 'scale-100 shadow-md' : 'scale-95 opacity-80'
-          }`}
-          style={{
-            background: input.trim()
-              ? 'linear-gradient(135deg, var(--teal), var(--dark))'
-              : 'var(--border)',
-            color: input.trim() ? '#fff' : 'var(--subtext)',
-            cursor: input.trim() ? 'pointer' : 'not-allowed',
-          }}
-        >
-          <svg className="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-          </svg>
-        </button>
+        <div className="flex items-end gap-2 px-4 py-3">
+          <input
+            type="file"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-[var(--hover)] transition-colors flex-shrink-0 disabled:opacity-50"
+            style={{ color: 'var(--subtext)' }}
+          >
+            {uploading ? (
+              <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            )}
+          </button>
+          <div
+            className="flex-1 flex items-end gap-2 rounded-2xl px-4 py-2"
+            style={{ backgroundColor: 'var(--input-bg)', border: '1px solid var(--border)' }}
+          >
+            <textarea
+              id="message-input"
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message"
+              rows={1}
+              className="flex-1 outline-none text-sm resize-none max-h-32 overflow-y-auto bg-transparent leading-relaxed"
+              style={{ color: 'var(--text)', lineHeight: '1.5' }}
+            />
+          </div>
+
+          <button
+            id="send-btn"
+            onClick={() => sendMessage()}
+            disabled={!input.trim()}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 ${
+              input.trim() ? 'scale-100 shadow-md' : 'scale-95 opacity-80'
+            }`}
+            style={{
+              background: input.trim()
+                ? 'linear-gradient(135deg, var(--teal), var(--dark))'
+                : 'var(--border)',
+              color: input.trim() ? '#fff' : 'var(--subtext)',
+              cursor: input.trim() ? 'pointer' : 'not-allowed',
+            }}
+          >
+            <svg className="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );

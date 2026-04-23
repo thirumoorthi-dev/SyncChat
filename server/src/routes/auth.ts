@@ -4,17 +4,40 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import UserModel from '../models/user.model.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { authSchemas } from '../validations/schemas.js';
 
-router.post('/register', async (req: express.Request, res: Response) => {
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, email, password]
+ *             properties:
+ *               username: { type: string, example: thiru }
+ *               email: { type: string, example: thiru@example.com }
+ *               password: { type: string, example: password123 }
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/AuthResponse' }
+ *       400:
+ *         description: Missing fields or invalid password
+ *       409:
+ *         description: Email or username already taken
+ */
+
+router.post('/register', validate({ body: authSchemas.register }), async (req: express.Request, res: Response) => {
   const { username, email, password } = req.body;
-
-  if (!username || !email || !password) {
-    return res.status(400).json({ message: 'All fields are required' });
-  }
-
-  if (password.length < 6) {
-    return res.status(400).json({ message: 'Password must be at least 6 characters' });
-  }
 
   try {
     const existing = await UserModel.findByEmailOrUsername(email, username);
@@ -41,12 +64,33 @@ router.post('/register', async (req: express.Request, res: Response) => {
   }
 });
 
-router.post('/login', async (req: express.Request, res: Response) => {
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login and get token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email: { type: string, example: thiru@example.com }
+ *               password: { type: string, example: password123 }
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/AuthResponse' }
+ *       401:
+ *         description: Invalid email or password
+ */
+router.post('/login', validate({ body: authSchemas.login }), async (req: express.Request, res: Response) => {
   const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required' });
-  }
 
   try {
     const result = await UserModel.findByEmail(email);
@@ -78,6 +122,23 @@ router.post('/login', async (req: express.Request, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user profile
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/User' }
+ *       401:
+ *         description: Unauthorized
+ */
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const result = await UserModel.findById(req.user.id);

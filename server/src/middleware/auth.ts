@@ -2,7 +2,20 @@ import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 
 export interface AuthRequest extends Request {
-  user?: any;
+  user?: {
+    id: string;
+    username: string;
+    email: string;
+  };
+}
+
+/** Use this type in route handlers that are protected by `authenticateToken`. */
+export interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+    username: string;
+    email: string;
+  };
 }
 
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {

@@ -8,7 +8,7 @@ const AVATAR_COLORS = [
 ];
 
 export interface UserRow {
-  id: number;
+  id: string;
   username: string;
   email: string;
   password_hash?: string;
@@ -25,7 +25,7 @@ export interface UserRow {
 }
 
 const UserModel = {
-  findById(id: number): Promise<QueryResult<UserRow>> {
+  findById(id: string): Promise<QueryResult<UserRow>> {
     return pool.query(
       `SELECT id, username, email, display_name, avatar_color, avatar_url,
               about, phone_number, is_online, last_seen, preferences, created_at, updated_at
@@ -41,7 +41,15 @@ const UserModel = {
     );
   },
 
-  findByEmailOrUsername(email: string, username: string): Promise<QueryResult<{ id: number }>> {
+  findByEmailPublic(email: string): Promise<QueryResult<UserRow>> {
+    return pool.query(
+      `SELECT id, username, email, display_name, avatar_color, avatar_url, about, is_online, last_seen
+       FROM users WHERE LOWER(email) = $1`,
+      [email.trim().toLowerCase()]
+    );
+  },
+
+  findByEmailOrUsername(email: string, username: string): Promise<QueryResult<{ id: string }>> {
     return pool.query(
       'SELECT id FROM users WHERE email = $1 OR username = $2',
       [email.toLowerCase(), username.toLowerCase()]
@@ -58,14 +66,14 @@ const UserModel = {
     );
   },
 
-  setOnlineStatus(id: number, isOnline: boolean): Promise<QueryResult> {
+  setOnlineStatus(id: string, isOnline: boolean): Promise<QueryResult> {
     return pool.query(
       'UPDATE users SET is_online = $1, last_seen = NOW() WHERE id = $2',
       [isOnline, id]
     );
   },
 
-  updateProfile(id: number, { displayName, avatarUrl, about, phoneNumber, preferences }: any): Promise<QueryResult<UserRow>> {
+  updateProfile(id: string, { displayName, avatarUrl, about, phoneNumber, preferences }: any): Promise<QueryResult<UserRow>> {
     return pool.query(
       `UPDATE users
        SET display_name   = COALESCE($2, display_name),
@@ -80,7 +88,7 @@ const UserModel = {
     );
   },
 
-  search(query: string, excludeUserId: number, limit: number = 20): Promise<QueryResult<UserRow>> {
+  search(query: string, excludeUserId: string, limit: number = 20): Promise<QueryResult<UserRow>> {
     return pool.query(
       `SELECT id, username, email, avatar_color, is_online, last_seen
        FROM users
@@ -90,7 +98,7 @@ const UserModel = {
     );
   },
 
-  findAllExcept(excludeUserId: number): Promise<QueryResult<UserRow>> {
+  findAllExcept(excludeUserId: string): Promise<QueryResult<UserRow>> {
     return pool.query(
       `SELECT id, username, email, avatar_color, is_online, last_seen
        FROM users WHERE id != $1
@@ -99,7 +107,65 @@ const UserModel = {
     );
   },
 
-  getConversations(userId: number): Promise<QueryResult<any>> {
+  // ── Contacts ─────────────────────────────────────────────────
+  addContact(ownerId: string, contactId: string): Promise<QueryResult<any>> {
+    return pool.query(
+      `INSERT INTO contacts (owner_id, contact_id)
+       VALUES ($1, $2)
+       ON CONFLICT (owner_id, contact_id) DO NOTHING
+       RETURNING *`,
+      [ownerId, contactId]
+    );
+  },
+
+  removeContact(ownerId: string, contactId: string): Promise<QueryResult<any>> {
+    return pool.query(
+      `DELETE FROM contacts WHERE owner_id = $1 AND contact_id = $2`,
+      [ownerId, contactId]
+    );
+  },
+
+  isContact(ownerId: string, contactId: string): Promise<QueryResult<any>> {
+    return pool.query(
+      `SELECT 1 FROM contacts WHERE owner_id = $1 AND contact_id = $2`,
+      [ownerId, contactId]
+    );
+  },
+
+  getContacts(userId: string): Promise<QueryResult<any>> {
+    return pool.query(
+      `SELECT
+         u.id, u.username, u.email, u.display_name, u.avatar_color,
+         u.avatar_url, u.about, u.is_online, u.last_seen,
+         c.nickname,
+         c.created_at AS contact_added_at,
+         m.content            AS last_message,
+         m.created_at         AS last_message_time,
+         m.sender_id          AS last_message_sender_id,
+         (
+           SELECT COUNT(*) FROM messages
+           WHERE receiver_id = $1 AND sender_id = u.id
+             AND is_read = FALSE AND group_id IS NULL
+         ) AS unread_count
+       FROM contacts c
+       JOIN users u ON u.id = c.contact_id
+       LEFT JOIN LATERAL (
+         SELECT content, created_at, sender_id
+         FROM messages
+         WHERE (sender_id = $1 AND receiver_id = u.id)
+            OR (receiver_id = $1 AND sender_id = u.id)
+         ORDER BY created_at DESC
+         LIMIT 1
+       ) m ON true
+       WHERE c.owner_id = $1
+       ORDER BY last_message_time DESC NULLS LAST, c.created_at DESC`,
+      [userId]
+    );
+  },
+
+  getConversations(userId: string): Promise<QueryResult<any>> {
+    // Returns conversations from message history only (for backward compat)
+    // The sidebar now uses getContacts() which merges contacts + messages
     return pool.query(
       `SELECT *
        FROM (
@@ -130,7 +196,7 @@ const UserModel = {
     );
   },
 
-  getPublicProfile(id: number): Promise<QueryResult<UserRow>> {
+  getPublicProfile(id: string): Promise<QueryResult<UserRow>> {
     return pool.query(
       `SELECT id, username, display_name, avatar_color, avatar_url, about, is_online, last_seen
        FROM users WHERE id = $1`,

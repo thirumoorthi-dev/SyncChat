@@ -10,3 +10,4 @@ Thumbs.db
 
 # Orchids platform files (internal tooling - not for repo)
 .orchids/
+/server/uploads

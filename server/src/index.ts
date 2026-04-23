@@ -11,7 +11,15 @@ import authRoutes from './routes/auth.js';
 import usersRoutes from './routes/users.js';
 import messagesRoutes from './routes/messages.js';
 import groupsRoutes from './routes/groups.js';
+import uploadRoutes from './routes/upload.js';
+import managementRoutes from './routes/management.js';
+import contactsRoutes from './routes/contacts.js';
 import { setupSocket } from './socket/socketHandler.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +38,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Static files for uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Swagger UI
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -63,6 +74,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/groups', groupsRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/management', managementRoutes);
+app.use('/api/contacts', contactsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

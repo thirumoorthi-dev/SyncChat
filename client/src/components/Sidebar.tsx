@@ -3,10 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import ConversationItem from './ConversationItem';
 import NewChatModal from './NewChatModal';
+import ProfileModal from './ProfileModal';
 import Avatar from './Avatar';
 import ThemeToggle from './ThemeToggle';
 import api from '../utils/api';
 import { ChatItem, Conversation, Group, Message, User } from '../types/chat';
+import { toast } from 'react-toastify';
 
 interface SidebarProps {
   activeChat: ChatItem | null;
@@ -19,17 +21,25 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [showProfile, setShowProfile] = useState<boolean>(false);
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
+  const [archivedIds, setArchivedIds] = useState<{ userId?: string, groupId?: string }[]>([]);
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [showArchived, setShowArchived] = useState<boolean>(false);
 
   const loadConversations = useCallback(async () => {
     try {
-      const [convRes, groupRes] = await Promise.all([
-        api.get('/users/conversations'),
+      const [convRes, groupRes, archRes, blockRes] = await Promise.all([
+        api.get('/contacts'),
         api.get('/groups'),
+        api.get('/management/archived'),
+        api.get('/management/blocks'),
       ]);
       setConversations(convRes.data.map((c: any) => ({ ...c, unread_count: parseInt(c.unread_count || '0', 10) })));
       setGroups(groupRes.data.map((g: any) => ({ ...g, unread_count: parseInt(g.unread_count || '0', 10) })));
+      setArchivedIds(archRes.data.map((a: any) => ({ userId: a.target_user_id, groupId: a.group_id })));
+      setBlockedIds(blockRes.data.map((b: any) => b.id));
     } catch (err) {
       console.error('Load conversations error:', err);
     }
@@ -139,12 +149,60 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
   };
 
   const handleSelectChat = (chat: ChatItem) => {
-    if (chat.type === 'direct') {
-      setConversations(prev => prev.map(c => c.id === chat.id ? { ...c, unread_count: 0 } : c));
-    } else {
-      setGroups(prev => prev.map(g => g.id === chat.id ? { ...g, unread_count: 0 } : g));
-    }
     onSelectChat(chat);
+  };
+
+  const handleArchiveChat = async (chat: ChatItem) => {
+    try {
+      await api.post('/management/archive', chat.type === 'direct' ? { targetUserId: chat.id } : { groupId: chat.id });
+      setArchivedIds(prev => [...prev, chat.type === 'direct' ? { userId: chat.id } : { groupId: chat.id }]);
+      if (activeChat?.id === chat.id && activeChat?.type === chat.type) onSelectChat(null as any);
+      toast.success('Chat archived');
+    } catch (err) {
+      console.error('Archive error:', err);
+      toast.error('Failed to archive chat');
+    }
+  };
+
+  const handleUnarchiveChat = async (chat: ChatItem) => {
+    try {
+      await api.post('/management/unarchive', chat.type === 'direct' ? { targetUserId: chat.id } : { groupId: chat.id });
+      setArchivedIds(prev => prev.filter(a => chat.type === 'direct' ? a.userId !== chat.id : a.groupId !== chat.id));
+      toast.success('Chat unarchived');
+    } catch (err) {
+      console.error('Unarchive error:', err);
+      toast.error('Failed to unarchive chat');
+    }
+  };
+
+  const handleBlockUser = async (userId: string) => {
+    try {
+      await api.post(`/management/block/${userId}`);
+      setBlockedIds(prev => [...prev, userId]);
+      toast.success('User blocked successfully');
+    } catch (err) {
+      console.error('Block error:', err);
+      toast.error('Failed to block user');
+    }
+  };
+
+  const handleUnblockUser = async (userId: string) => {
+    try {
+      await api.delete(`/management/block/${userId}`);
+      setBlockedIds(prev => prev.filter(id => id !== userId));
+      toast.success('User unblocked successfully');
+    } catch (err) {
+      console.error('Unblock error:', err);
+      toast.error('Failed to unblock user');
+    }
+  };
+
+  const isChatArchived = (chat: ChatItem) => {
+    return archivedIds.some(a => chat.type === 'direct' ? a.userId === chat.id : a.groupId === chat.id);
+  };
+
+  const isChatBlocked = (chat: ChatItem) => {
+    return blockedIds.includes(chat.id);
   };
 
   const allChats: ChatItem[] = [
@@ -154,13 +212,19 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
     new Date(b.last_message_time || 0).getTime() - new Date(a.last_message_time || 0).getTime()
   );
 
-  const filtered = search.trim()
-    ? allChats.filter(c =>
-        (c.type === 'group' ? c.name : (c.display_name || c.username || '')).toLowerCase().includes(search.toLowerCase())
-      )
-    : allChats;
+  const filtered = allChats.filter(c => {
+    const matchesSearch = (c.type === 'group' ? c.name : (c.display_name || c.username || '')).toLowerCase().includes(search.toLowerCase());
+    const archived = isChatArchived(c);
+    
+    if (search.trim()) return matchesSearch;
+    if (showArchived) return archived && matchesSearch;
+    return !archived && matchesSearch;
+  });
 
-  const totalUnread = allChats.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+  const totalUnread = allChats.reduce((sum, c) => {
+    if (isChatArchived(c)) return sum;
+    return sum + (c.unread_count || 0);
+  }, 0);
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--panel)', borderRight: '1px solid var(--border)' }}>
@@ -230,6 +294,13 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
                   >
                     ✏️ New Chat
                   </button>
+                  <button
+                    onClick={() => { setShowProfile(true); setShowMenu(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--hover)] transition-colors"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    👤 Profile
+                  </button>
                   <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
                   <button
                     onClick={() => { setShowMenu(false); logout(); }}
@@ -271,12 +342,17 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
       </div>
 
       {/* ── Section label ── */}
-      {!search && allChats.length > 0 && (
+      {!search && (
         <div className="px-4 pt-2 pb-1 flex items-center justify-between flex-shrink-0">
-          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--subtext)' }}>
-            All Chats
-          </span>
-          {totalUnread > 0 && (
+          <button 
+            onClick={() => setShowArchived(!showArchived)}
+            className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest transition-colors hover:text-[var(--teal)]"
+            style={{ color: showArchived ? 'var(--teal)' : 'var(--subtext)' }}
+          >
+            {showArchived ? '📂 Showing Archived' : '📁 Archived Chats'}
+            <span className="opacity-60">({archivedIds.length})</span>
+          </button>
+          {totalUnread > 0 && !showArchived && (
             <span className="text-[10px] font-bold text-[var(--teal)]">
               {totalUnread} unread
             </span>
@@ -300,6 +376,12 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
               isActive={activeChat?.id === chatItem.id && activeChat?.type === chatItem.type}
               onClick={() => handleSelectChat(chatItem)}
               currentUserId={user?.id}
+              isArchived={isChatArchived(chatItem)}
+              onArchive={() => handleArchiveChat(chatItem)}
+              onUnarchive={() => handleUnarchiveChat(chatItem)}
+              onBlock={chatItem.type === 'direct' ? () => handleBlockUser(chatItem.id) : undefined}
+              isBlocked={isChatBlocked(chatItem)}
+              onUnblock={chatItem.type === 'direct' ? () => handleUnblockUser(chatItem.id) : undefined}
             />
           ))
         )}
@@ -312,6 +394,11 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
           onSelectUser={handleSelectUser}
           onCreateGroup={handleCreateGroup}
         />
+      )}
+
+      {/* Profile Modal */}
+      {showProfile && (
+        <ProfileModal onClose={() => setShowProfile(false)} />
       )}
     </div>
   );

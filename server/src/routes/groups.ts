@@ -3,13 +3,38 @@ const router = express.Router();
 import GroupModel from '../models/group.model.js';
 import MessageModel from '../models/message.model.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { groupSchemas, messageSchemas } from '../validations/schemas.js';
 
-router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
+/**
+ * @swagger
+ * /api/groups:
+ *   post:
+ *     summary: Create a new group
+ *     tags: [Groups]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name: { type: string, example: "Dev Team" }
+ *               description: { type: string, example: "SyncChat developer group" }
+ *               memberIds: { type: array, items: { type: string, format: uuid }, example: ["uuid1", "uuid2"] }
+ *     responses:
+ *       201:
+ *         description: Group created
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Group' }
+ */
+
+router.post('/', authenticateToken, validate({ body: groupSchemas.create }), async (req: AuthRequest, res: Response) => {
   const { name, description, memberIds } = req.body;
-
-  if (!name || !name.trim()) {
-    return res.status(400).json({ message: 'Group name is required' });
-  }
 
   try {
     const group = await GroupModel.createGroupWithMembers({
@@ -28,6 +53,21 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/groups:
+ *   get:
+ *     summary: Get all groups the user belongs to
+ *     tags: [Groups]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of groups
+ *         content:
+ *           application/json:
+ *             schema: { type: array, items: { $ref: '#/components/schemas/Group' } }
+ */
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const result = await GroupModel.getUserGroups(req.user.id);
@@ -38,21 +78,49 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.get('/:groupId/messages', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { groupId } = req.params;
-  const limit = parseInt(req.query.limit as string) || 50;
-  const offset = parseInt(req.query.offset as string) || 0;
+/**
+ * @swagger
+ * /api/groups/{groupId}/messages:
+ *   get:
+ *     summary: Get messages for a group
+ *     tags: [Groups]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 50 }
+ *       - in: query
+ *         name: beforeId
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: List of group messages
+ *         content:
+ *           application/json:
+ *             schema: { type: array, items: { $ref: '#/components/schemas/Message' } }
+ */
+router.get('/:groupId/messages', 
+  authenticateToken, 
+  validate({ params: groupSchemas.groupIdParam, query: messageSchemas.pagination }),
+  async (req: AuthRequest, res: Response) => {
+    const { groupId } = req.params;
+    const { limit, beforeId } = req.query as any;
 
   try {
-    const member = await GroupModel.checkMembership(parseInt(groupId), req.user.id);
+    const member = await GroupModel.checkMembership(groupId, req.user.id);
 
     if (member.rows.length === 0) {
       return res.status(403).json({ message: 'Not a member of this group' });
     }
 
-    const result = await GroupModel.getGroupMessages(parseInt(groupId), limit, offset);
+    const result = await GroupModel.getGroupMessages(groupId, limit, beforeId);
 
-    await MessageModel.markGroupMessagesRead(parseInt(groupId), req.user.id);
+    await MessageModel.markGroupMessagesRead(groupId, req.user.id);
 
     res.json(result.rows.reverse());
   } catch (error) {
@@ -61,16 +129,19 @@ router.get('/:groupId/messages', authenticateToken, async (req: AuthRequest, res
   }
 });
 
-router.post('/:groupId/read', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { groupId } = req.params;
+router.post('/:groupId/read', 
+  authenticateToken, 
+  validate({ params: groupSchemas.groupIdParam }),
+  async (req: AuthRequest, res: Response) => {
+    const { groupId } = req.params;
 
   try {
-    const member = await GroupModel.checkMembership(parseInt(groupId), req.user.id);
+    const member = await GroupModel.checkMembership(groupId, req.user.id);
     if (member.rows.length === 0) {
       return res.status(403).json({ message: 'Not a member of this group' });
     }
 
-    await MessageModel.markGroupMessagesRead(parseInt(groupId), req.user.id);
+    await MessageModel.markGroupMessagesRead(groupId, req.user.id);
     res.json({ message: 'Messages marked as read' });
   } catch (error) {
     console.error('Mark group read error:', error);
@@ -78,17 +149,45 @@ router.post('/:groupId/read', authenticateToken, async (req: AuthRequest, res: R
   }
 });
 
-router.get('/:groupId', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { groupId } = req.params;
+/**
+ * @swagger
+ * /api/groups/{groupId}:
+ *   get:
+ *     summary: Get group details and members
+ *     tags: [Groups]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Group details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Group'
+ *                 - type: object
+ *                   properties:
+ *                     members: { type: array, items: { $ref: '#/components/schemas/User' } }
+ */
+router.get('/:groupId', 
+  authenticateToken, 
+  validate({ params: groupSchemas.groupIdParam }),
+  async (req: AuthRequest, res: Response) => {
+    const { groupId } = req.params;
 
   try {
-    const groupResult = await GroupModel.getGroupById(parseInt(groupId));
+    const groupResult = await GroupModel.getGroupById(groupId);
 
     if (groupResult.rows.length === 0) {
       return res.status(404).json({ message: 'Group not found' });
     }
 
-    const membersResult = await GroupModel.getGroupMembers(parseInt(groupId));
+    const membersResult = await GroupModel.getGroupMembers(groupId);
 
     res.json({ ...groupResult.rows[0], members: membersResult.rows });
   } catch (error) {
@@ -97,18 +196,46 @@ router.get('/:groupId', authenticateToken, async (req: AuthRequest, res: Respons
   }
 });
 
-router.post('/:groupId/members', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { groupId } = req.params;
-  const { userId } = req.body;
+/**
+ * @swagger
+ * /api/groups/{groupId}/members:
+ *   post:
+ *     summary: Add a member to a group (Admins only)
+ *     tags: [Groups]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId]
+ *             properties:
+ *               userId: { type: string, format: uuid, example: "uuid123" }
+ *     responses:
+ *       200: { description: Member added }
+ */
+router.post('/:groupId/members', 
+  authenticateToken, 
+  validate({ params: groupSchemas.groupIdParam, body: groupSchemas.addMember }),
+  async (req: AuthRequest, res: Response) => {
+    const { groupId } = req.params;
+    const { userId } = req.body;
 
   try {
-    const adminCheck = await GroupModel.checkAdmin(parseInt(groupId), req.user.id);
+    const adminCheck = await GroupModel.checkAdmin(groupId, req.user.id);
 
     if (adminCheck.rows.length === 0) {
       return res.status(403).json({ message: 'Only admins can add members' });
     }
 
-    await GroupModel.addMember(parseInt(groupId), parseInt(userId));
+    await GroupModel.addMember(groupId, userId);
     res.json({ message: 'Member added successfully' });
   } catch (error) {
     console.error('Add member error:', error);

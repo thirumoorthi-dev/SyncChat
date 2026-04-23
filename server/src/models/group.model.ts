@@ -1,11 +1,12 @@
-import pool from '../config/db.js';
 import { QueryResult, PoolClient } from 'pg';
+import MessageModel from './message.model.js';
+import pool from '../config/db.js';
 
 export interface GroupRow {
-  id: number;
+  id: string;
   name: string;
   description?: string | null;
-  created_by: number;
+  created_by: string;
   avatar_color: string;
   created_at: Date;
   member_count?: number | string;
@@ -18,8 +19,8 @@ const GroupModel = {
   async createGroupWithMembers({ name, description, creatorId, memberIds }: { 
     name: string; 
     description?: string; 
-    creatorId: number; 
-    memberIds: number[] 
+    creatorId: string; 
+    memberIds: string[] 
   }): Promise<GroupRow> {
     const client: PoolClient = await pool.connect();
     try {
@@ -62,7 +63,7 @@ const GroupModel = {
     }
   },
 
-  getUserGroups(userId: number): Promise<QueryResult<GroupRow>> {
+  getUserGroups(userId: string): Promise<QueryResult<GroupRow>> {
     return pool.query(
       `SELECT g.*,
         (
@@ -92,7 +93,7 @@ const GroupModel = {
     );
   },
 
-  getGroupMembers(groupId: number): Promise<QueryResult<any>> {
+  getGroupMembers(groupId: string): Promise<QueryResult<any>> {
     return pool.query(
       `SELECT u.id, u.username, u.avatar_color, u.is_online, u.last_seen, gm.is_admin, gm.joined_at
        FROM group_members gm JOIN users u ON u.id = gm.user_id
@@ -102,46 +103,36 @@ const GroupModel = {
     );
   },
 
-  checkMembership(groupId: number, userId: number): Promise<QueryResult<{ id: number }>> {
+  checkMembership(groupId: string, userId: string): Promise<QueryResult<{ id: string }>> {
     return pool.query(
       'SELECT id FROM group_members WHERE group_id = $1 AND user_id = $2',
       [groupId, userId]
     );
   },
 
-  checkAdmin(groupId: number, userId: number): Promise<QueryResult<{ id: number }>> {
+  checkAdmin(groupId: string, userId: string): Promise<QueryResult<{ id: string }>> {
     return pool.query(
       'SELECT id FROM group_members WHERE group_id = $1 AND user_id = $2 AND is_admin = TRUE',
       [groupId, userId]
     );
   },
 
-  getGroupMessages(groupId: number, limit: number = 50, offset: number = 0): Promise<QueryResult<any>> {
-    return pool.query(
-      `SELECT m.*,
-        u.username AS sender_username,
-        u.avatar_color AS sender_avatar_color
-       FROM messages m
-       JOIN users u ON u.id = m.sender_id
-       WHERE m.group_id = $1
-       ORDER BY m.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [groupId, limit, offset]
-    );
+  getGroupMessages(groupId: string, limit: number = 50, beforeId: string | null = null): Promise<QueryResult<any>> {
+    return MessageModel.getGroupMessages(groupId, limit, beforeId);
   },
 
-  getGroupById(groupId: number): Promise<QueryResult<GroupRow>> {
+  getGroupById(groupId: string): Promise<QueryResult<GroupRow>> {
     return pool.query('SELECT * FROM groups WHERE id = $1', [groupId]);
   },
 
-  addMember(groupId: number, userId: number): Promise<QueryResult> {
+  addMember(groupId: string, userId: string): Promise<QueryResult> {
     return pool.query(
       'INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [groupId, userId]
     );
   },
 
-  getUserGroupIds(userId: number): Promise<QueryResult<{ group_id: number }>> {
+  getUserGroupIds(userId: string): Promise<QueryResult<{ group_id: string }>> {
     return pool.query(
       'SELECT group_id FROM group_members WHERE user_id = $1',
       [userId]

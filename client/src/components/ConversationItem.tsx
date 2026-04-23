@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Avatar from './Avatar';
 import { formatConversationTime } from '../utils/formatTime';
 import { ChatItem } from '../types/chat';
@@ -7,14 +7,37 @@ interface ConversationItemProps {
   chat: ChatItem;
   isActive: boolean;
   onClick: () => void;
-  currentUserId?: number;
+  currentUserId?: string;
+  isArchived?: boolean;
+  onArchive?: () => void;
+  onUnarchive?: () => void;
+  onBlock?: () => void;
+  isBlocked?: boolean;
+  onUnblock?: () => void;
 }
 
-export default function ConversationItem({ chat, isActive, onClick, currentUserId }: ConversationItemProps) {
+export default function ConversationItem({ 
+  chat, 
+  isActive, 
+  onClick, 
+  currentUserId,
+  isArchived,
+  onArchive,
+  onUnarchive,
+  onBlock ,
+  isBlocked,
+  onUnblock,
+}: ConversationItemProps) {
+  const [showMenu, setShowMenu] = useState(false);
   const name = chat.type === 'group' ? chat.name : (chat.display_name || chat.username || '?');
   const lastMsg = chat.last_message;
   const unread = chat.unread_count || 0;
   const isGroup = chat.type === 'group';
+
+  const handleMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(!showMenu);
+  };
 
   return (
     <div
@@ -23,7 +46,7 @@ export default function ConversationItem({ chat, isActive, onClick, currentUserI
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
       className={`
-        slide-item relative flex items-center gap-3 px-4 py-3 cursor-pointer
+        slide-item group relative flex items-center gap-3 px-4 py-3 cursor-pointer
         transition-colors duration-150
         ${isActive
           ? 'bg-[var(--active-bg)] border-l-[3px] border-[var(--active-bar)]'
@@ -44,13 +67,66 @@ export default function ConversationItem({ chat, isActive, onClick, currentUserI
           <span className="font-semibold text-[var(--text)] text-sm truncate leading-tight">
             {name}
           </span>
-          <span
-            className={`text-xs flex-shrink-0 ml-2 ${
-              unread > 0 ? 'text-[var(--teal)] font-medium' : 'text-[var(--subtext)]'
-            }`}
-          >
-            {formatConversationTime(chat.last_message_time)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-xs flex-shrink-0 ${
+                unread > 0 ? 'text-[var(--teal)] font-medium' : 'text-[var(--subtext)]'
+              }`}
+            >
+              {formatConversationTime(chat.last_message_time)}
+            </span>
+            
+            {/* Context Menu Trigger */}
+            <div className="relative">
+              <button 
+                onClick={handleMenuClick}
+                className="opacity-0 group-hover:opacity-100 p-0.5 rounded-full hover:bg-[var(--hover)] transition-all duration-150"
+                title="Options"
+              >
+                <svg className="w-4 h-4 text-[var(--subtext)]" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                </svg>
+              </button>
+
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={(e) => { e.stopPropagation(); setShowMenu(false); }} />
+                  <div className="absolute right-0 top-6 w-36 py-1 rounded-lg shadow-xl z-40 bg-[var(--modal-bg)] border border-[var(--border)] pop-in">
+                    {isArchived ? (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onUnarchive?.(); setShowMenu(false); }}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-[var(--text)]"
+                      >
+                        📥 Unarchive
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onArchive?.(); setShowMenu(false); }}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-[var(--text)]"
+                      >
+                        📁 Archive
+                      </button>
+                    )}
+                    {isBlocked ? (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onUnblock?.(); setShowMenu(false); }}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-green-500"
+                      >
+                        ✅ Unblock User
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onBlock?.(); setShowMenu(false); }}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-red-500"
+                      >
+                        🚫 Block User
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Bottom row */}

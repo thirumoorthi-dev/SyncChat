@@ -2,53 +2,166 @@ import pool from '../config/db.js';
 import { QueryResult } from 'pg';
 
 export interface MessageRow {
-  id: number;
-  sender_id: number;
-  receiver_id?: number | null;
-  group_id?: number | null;
+  id: string;
+  sender_id: string;
+  receiver_id?: string | null;
+  group_id?: string | null;
   content: string;
   is_read: boolean;
+  is_deleted: boolean;
+  is_edited: boolean;
+  replied_to_id?: string | null;
   created_at: Date;
   sender_username?: string;
   sender_avatar_color?: string;
+  parent_message_content?: string;
+  parent_message_sender?: string;
+  reactions?: any[];
+  media_url?: string | null;
+  media_mime_type?: string | null;
+  media_size_bytes?: string | number | null;
+  media_filename?: string | null;
+  media_thumbnail_url?: string | null;
+  message_type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'location' | 'sticker';
 }
 
 const MessageModel = {
-  getDirectMessages(userId1: number, userId2: number, limit: number = 50, offset: number = 0): Promise<QueryResult<MessageRow>> {
-    return pool.query(
-      `SELECT m.*,
+  getDirectMessages(userId1: string, userId2: string, limit: number = 50, beforeId: string | null = null): Promise<QueryResult<MessageRow>> {
+    const params: any[] = [userId1, userId2, limit];
+    let query = `SELECT m.*, 
         u.username AS sender_username,
-        u.avatar_color AS sender_avatar_color
+        u.avatar_color AS sender_avatar_color,
+        pm.content AS parent_message_content,
+        pu.username AS parent_message_sender,
+        (SELECT json_agg(json_build_object('reaction', r.reaction, 'user_id', r.user_id, 'username', ru.username))
+         FROM message_reactions r
+         JOIN users ru ON ru.id = r.user_id
+         WHERE r.message_id = m.id) AS reactions
        FROM messages m
        JOIN users u ON u.id = m.sender_id
+       LEFT JOIN messages pm ON pm.id = m.replied_to_id
+       LEFT JOIN users pu ON pu.id = pm.sender_id
        WHERE m.group_id IS NULL AND (
          (m.sender_id = $1 AND m.receiver_id = $2) OR
          (m.sender_id = $2 AND m.receiver_id = $1)
-       )
-       ORDER BY m.created_at DESC
-       LIMIT $3 OFFSET $4`,
-      [userId1, userId2, limit, offset]
+       )`;
+
+    if (beforeId) {
+      params.push(beforeId);
+      query += ` AND m.created_at < (SELECT created_at FROM messages WHERE id = $${params.length})`;
+    }
+
+    query += ` ORDER BY m.created_at DESC LIMIT $3`;
+    return pool.query(query, params);
+  },
+
+  getGroupMessages(groupId: string, limit: number = 50, beforeId: string | null = null): Promise<QueryResult<MessageRow>> {
+    const params: any[] = [groupId, limit];
+    let query = `SELECT m.*,
+        u.username AS sender_username,
+        u.avatar_color AS sender_avatar_color,
+        pm.content AS parent_message_content,
+        pu.username AS parent_message_sender,
+        (SELECT json_agg(json_build_object('reaction', r.reaction, 'user_id', r.user_id, 'username', ru.username))
+         FROM message_reactions r
+         JOIN users ru ON ru.id = r.user_id
+         WHERE r.message_id = m.id) AS reactions
+       FROM messages m
+       JOIN users u ON u.id = m.sender_id
+       LEFT JOIN messages pm ON pm.id = m.replied_to_id
+       LEFT JOIN users pu ON pu.id = pm.sender_id
+       WHERE m.group_id = $1`;
+
+    if (beforeId) {
+      params.push(beforeId);
+      query += ` AND m.created_at < (SELECT created_at FROM messages WHERE id = $${params.length})`;
+    }
+
+    query += ` ORDER BY m.created_at DESC LIMIT $2`;
+    return pool.query(query, params);
+  },
+
+  sendGroupMessage(senderId: string, groupId: string, content: string | null, repliedToId: string | null = null, media: any = {}): Promise<QueryResult<MessageRow>> {
+    const { media_url, message_type = 'text', media_mime_type, media_size_bytes, media_filename, media_thumbnail_url } = media;
+    return pool.query(
+      `INSERT INTO messages (sender_id, group_id, content, replied_to_id, media_url, message_type, media_mime_type, media_size_bytes, media_filename, media_thumbnail_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [senderId, groupId, content, repliedToId, media_url, message_type, media_mime_type, media_size_bytes, media_filename, media_thumbnail_url]
     );
   },
 
-  sendDirectMessage(senderId: number, receiverId: number, content: string): Promise<QueryResult<MessageRow>> {
+  sendDirectMessage(senderId: string, receiverId: string, content: string | null, repliedToId: string | null = null, media: any = {}): Promise<QueryResult<MessageRow>> {
+    const { media_url, message_type = 'text', media_mime_type, media_size_bytes, media_filename, media_thumbnail_url } = media;
     return pool.query(
-      `INSERT INTO messages (sender_id, receiver_id, content)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [senderId, receiverId, content]
+      `INSERT INTO messages (sender_id, receiver_id, content, replied_to_id, media_url, message_type, media_mime_type, media_size_bytes, media_filename, media_thumbnail_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [senderId, receiverId, content, repliedToId, media_url, message_type, media_mime_type, media_size_bytes, media_filename, media_thumbnail_url]
     );
   },
 
-  getMessageWithSenderDetails(messageId: number): Promise<QueryResult<MessageRow>> {
+  editMessage(id: string, userId: string, newContent: string): Promise<QueryResult<MessageRow>> {
     return pool.query(
-      `SELECT m.*, u.username AS sender_username, u.avatar_color AS sender_avatar_color
-       FROM messages m JOIN users u ON u.id = m.sender_id
+      `UPDATE messages SET content = $1, is_edited = TRUE, edited_at = NOW()
+       WHERE id = $2 AND sender_id = $3 AND is_deleted = FALSE
+       RETURNING *`,
+      [newContent, id, userId]
+    );
+  },
+
+  deleteMessage(id: string, userId: string): Promise<QueryResult<MessageRow>> {
+    return pool.query(
+      `UPDATE messages SET is_deleted = TRUE, deleted_at = NOW(), content = NULL
+       WHERE id = $1 AND sender_id = $2
+       RETURNING *`,
+      [id, userId]
+    );
+  },
+
+  toggleReaction(messageId: string, userId: string, reaction: string): Promise<QueryResult> {
+    return pool.query(
+      `INSERT INTO message_reactions (message_id, user_id, reaction)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (message_id, user_id)
+       DO UPDATE SET reaction = EXCLUDED.reaction, created_at = NOW()
+       WHERE message_reactions.reaction != EXCLUDED.reaction`,
+      [messageId, userId, reaction]
+    );
+  },
+
+  removeReaction(messageId: string, userId: string): Promise<QueryResult> {
+    return pool.query(
+      `DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2`,
+      [messageId, userId]
+    );
+  },
+
+  getMessageWithDetails(messageId: string): Promise<QueryResult<MessageRow>> {
+    return pool.query(
+      `SELECT m.*,
+        u.username AS sender_username,
+        u.avatar_color AS sender_avatar_color,
+        pm.content AS parent_message_content,
+        pu.username AS parent_message_sender,
+        (SELECT json_agg(json_build_object('reaction', r.reaction, 'user_id', r.user_id, 'username', ru.username))
+         FROM message_reactions r
+         JOIN users ru ON ru.id = r.user_id
+         WHERE r.message_id = m.id) AS reactions
+       FROM messages m
+       JOIN users u ON u.id = m.sender_id
+       LEFT JOIN messages pm ON pm.id = m.replied_to_id
+       LEFT JOIN users pu ON pu.id = pm.sender_id
        WHERE m.id = $1`,
       [messageId]
     );
   },
 
-  markDirectMessagesAsRead(receiverId: number, senderId: number): Promise<QueryResult> {
+  getMessageWithSenderDetails(messageId: string): Promise<QueryResult<MessageRow>> {
+    return this.getMessageWithDetails(messageId);
+  },
+
+  markDirectMessagesAsRead(receiverId: string, senderId: string): Promise<QueryResult> {
     return pool.query(
       `UPDATE messages SET is_read = TRUE
        WHERE receiver_id = $1 AND sender_id = $2 AND is_read = FALSE AND group_id IS NULL`,
@@ -56,16 +169,7 @@ const MessageModel = {
     );
   },
 
-  sendGroupMessage(senderId: number, groupId: number, content: string): Promise<QueryResult<MessageRow>> {
-    return pool.query(
-      `INSERT INTO messages (sender_id, group_id, content)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [senderId, groupId, content]
-    );
-  },
-
-  markGroupMessagesRead(groupId: number, userId: number): Promise<QueryResult> {
+  markGroupMessagesRead(groupId: string, userId: string): Promise<QueryResult> {
     return pool.query(
       `INSERT INTO message_read_receipts (message_id, user_id)
        SELECT m.id, $2
@@ -81,7 +185,7 @@ const MessageModel = {
     );
   },
 
-  getGroupUnreadCount(groupId: number, userId: number): Promise<QueryResult<{ unread_count: string }>> {
+  getGroupUnreadCount(groupId: string, userId: string): Promise<QueryResult<{ unread_count: string }>> {
     return pool.query(
       `SELECT COUNT(*) AS unread_count
        FROM messages m
