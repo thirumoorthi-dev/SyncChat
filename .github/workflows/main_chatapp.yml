@@ -9,6 +9,9 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,21 +22,26 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js version
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22.x'
 
       - name: npm install, build, and test
+        working-directory: ./server
         run: |
           npm install
           npm run build --if-present
           npm run test --if-present
 
+      - name: Zip artifact for deployment
+        working-directory: ./server
+        run: zip -r ../release.zip .
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: release.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -54,12 +62,10 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_0BCAEA800281477E80B4868829386145 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_7E410073159C446C9180422392BCD53D }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_88D78C0FA3B940DFAA99491BAE710571 }}
-
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'chatapp'
           slot-name: 'Production'
-          package: .
-          
+          package: release.zip
