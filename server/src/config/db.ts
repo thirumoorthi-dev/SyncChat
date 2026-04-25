@@ -7,11 +7,7 @@ dotenv.config();
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
-
-pool.on('connect', (client) => {
-  client.query('SET search_path TO chatapp, public');
-  console.log('Connected to PostgreSQL database (Schema: chatapp)');
+  options: '-c search_path=chatapp,public'
 });
 
 pool.on('error', (err: Error) => {
