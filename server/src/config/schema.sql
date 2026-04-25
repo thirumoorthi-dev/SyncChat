@@ -10,7 +10,7 @@ CREATE SCHEMA IF NOT EXISTS chatapp;
 SET search_path TO chatapp, public;
 
 -- ── Extensions ────────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- No extensions needed! gen_random_uuid() is built into Postgres 13+ natively.
 
 -- ── ENUM Types ────────────────────────────────────────────────
 DO $$ BEGIN
@@ -29,7 +29,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ── Users ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username             VARCHAR(50)  UNIQUE NOT NULL CHECK (length(username) >= 3),
   email                VARCHAR(100) UNIQUE NOT NULL,
   password_hash        VARCHAR(255) NOT NULL,
@@ -58,7 +58,7 @@ CREATE TRIGGER trg_users_updated_at
 
 -- ── Groups ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS groups (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                 VARCHAR(100) NOT NULL CHECK (length(trim(name)) > 0),
   description          TEXT,
   created_by           UUID         REFERENCES users(id) ON DELETE SET NULL,
@@ -78,7 +78,7 @@ CREATE TRIGGER trg_groups_updated_at
 
 -- ── Group Members ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS group_members (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id             UUID         NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
   user_id              UUID         NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
   role                 member_role_enum DEFAULT 'member',
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS group_members (
 
 -- ── Messages ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS messages (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id            UUID         REFERENCES users(id)  ON DELETE SET NULL,
   receiver_id          UUID         REFERENCES users(id)  ON DELETE CASCADE,
   group_id             UUID         REFERENCES groups(id) ON DELETE CASCADE,
@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- ── Message Read Receipts (Group) ────────────────────────────
 CREATE TABLE IF NOT EXISTS message_read_receipts (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id           UUID         NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
   user_id              UUID         NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
   read_at              TIMESTAMP    DEFAULT NOW(),
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS message_read_receipts (
 
 -- ── Message Reactions ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS message_reactions (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id           UUID         NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
   user_id              UUID         NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
   reaction             VARCHAR(8)   NOT NULL,
@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS message_reactions (
 
 -- ── User Blocks ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_blocks (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   blocker_id           UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   blocked_id           UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at           TIMESTAMP    DEFAULT NOW(),
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS user_blocks (
 
 -- ── Archived Chats ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS archived_chats (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id              UUID         NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
   target_user_id       UUID         REFERENCES users(id)           ON DELETE CASCADE,
   group_id             UUID         REFERENCES groups(id)          ON DELETE CASCADE,
@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS archived_chats (
 -- Stores explicit contact relationships (one-directional)
 -- A adds B → B shows in A's sidebar even before first message
 CREATE TABLE IF NOT EXISTS contacts (
-  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   contact_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   nickname     VARCHAR(60),
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS contacts (
 
 -- ── User Devices / Sessions ───────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_devices (
-  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id              UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   device_name          VARCHAR(100),
   socket_id            VARCHAR(100),
