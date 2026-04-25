@@ -9,8 +9,9 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
-pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database');
+pool.on('connect', (client) => {
+  client.query('SET search_path TO chatapp, public');
+  console.log('Connected to PostgreSQL database (Schema: chatapp)');
 });
 
 pool.on('error', (err: Error) => {

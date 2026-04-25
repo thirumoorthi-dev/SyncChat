@@ -5,6 +5,10 @@
 --  Version : 2.0  (Day-1 Enhancement)
 -- =============================================================
 
+-- ── Schema Setup ─────────────────────────────────────────────
+CREATE SCHEMA IF NOT EXISTS chatapp;
+SET search_path TO chatapp, public;
+
 -- ── Extensions ────────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
