@@ -36,7 +36,7 @@ import { messageSchemas } from '../validations/schemas.js';
 router.get('/direct/:userId', 
   authenticateToken, 
   validate({ params: messageSchemas.idParam, query: messageSchemas.pagination }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
     const { userId } = req.params;
     const { limit, beforeId } = req.query as any;
 
@@ -87,7 +87,7 @@ router.get('/direct/:userId',
 router.post('/direct/:userId', 
   authenticateToken, 
   validate({ params: messageSchemas.idParam, body: messageSchemas.sendDirect }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
     const { userId } = req.params;
     const { content, media, repliedToId } = req.body;
 

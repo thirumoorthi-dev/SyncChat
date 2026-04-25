@@ -141,7 +141,7 @@ router.post('/login', validate({ body: authSchemas.login }), async (req: express
  */
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const result = await UserModel.findById(req.user.id);
+    const result = await UserModel.findById(req.user!.id);
     if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
     res.json(result.rows[0]);
   } catch (error) {

@@ -33,7 +33,7 @@ import { groupSchemas, messageSchemas } from '../validations/schemas.js';
  *             schema: { $ref: '#/components/schemas/Group' }
  */
 
-router.post('/', authenticateToken, validate({ body: groupSchemas.create }), async (req: AuthRequest, res: Response) => {
+router.post('/', authenticateToken, validate({ body: groupSchemas.create }), async (req: any, res: Response) => {
   const { name, description, memberIds } = req.body;
 
   try {
@@ -68,7 +68,7 @@ router.post('/', authenticateToken, validate({ body: groupSchemas.create }), asy
  *           application/json:
  *             schema: { type: array, items: { $ref: '#/components/schemas/Group' } }
  */
-router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticateToken, async (req: any, res: Response) => {
   try {
     const result = await GroupModel.getUserGroups(req.user.id);
     res.json(result.rows);
@@ -107,7 +107,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 router.get('/:groupId/messages', 
   authenticateToken, 
   validate({ params: groupSchemas.groupIdParam, query: messageSchemas.pagination }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
     const { groupId } = req.params;
     const { limit, beforeId } = req.query as any;
 
@@ -132,7 +132,7 @@ router.get('/:groupId/messages',
 router.post('/:groupId/read', 
   authenticateToken, 
   validate({ params: groupSchemas.groupIdParam }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
     const { groupId } = req.params;
 
   try {
@@ -177,7 +177,7 @@ router.post('/:groupId/read',
 router.get('/:groupId', 
   authenticateToken, 
   validate({ params: groupSchemas.groupIdParam }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
     const { groupId } = req.params;
 
   try {
@@ -224,7 +224,7 @@ router.get('/:groupId',
 router.post('/:groupId/members', 
   authenticateToken, 
   validate({ params: groupSchemas.groupIdParam, body: groupSchemas.addMember }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
     const { groupId } = req.params;
     const { userId } = req.body;
 

@@ -27,7 +27,7 @@ import { userSchemas } from '../validations/schemas.js';
  *             schema: { type: array, items: { $ref: '#/components/schemas/User' } }
  */
 
-router.get('/search', authenticateToken, validate({ query: userSchemas.search }), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/search', authenticateToken, validate({ query: userSchemas.search }), async (req: any, res: Response) => {
   const { q } = req.query as any;
   try {
     const result = await UserModel.search(q, req.user.id);
@@ -53,7 +53,7 @@ router.get('/search', authenticateToken, validate({ query: userSchemas.search })
  *           application/json:
  *             schema: { type: array, items: { $ref: '#/components/schemas/User' } }
  */
-router.get('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/', authenticateToken, async (req: any, res: Response) => {
   try {
     const result = await UserModel.findAllExcept(req.user.id);
     res.json(result.rows);
@@ -78,7 +78,7 @@ router.get('/', authenticateToken, async (req: AuthenticatedRequest, res: Respon
  *           application/json:
  *             schema: { type: array, items: { $ref: '#/components/schemas/Conversation' } }
  */
-router.get('/conversations', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/conversations', authenticateToken, async (req: any, res: Response) => {
   try {
     const result = await UserModel.getConversations(req.user.id);
     res.json(result.rows);
@@ -113,7 +113,7 @@ router.get('/conversations', authenticateToken, async (req: AuthenticatedRequest
  *           application/json:
  *             schema: { $ref: '#/components/schemas/User' }
  */
-router.patch('/me', authenticateToken, validate({ body: userSchemas.updateProfile }), async (req: AuthenticatedRequest, res: Response) => {
+router.patch('/me', authenticateToken, validate({ body: userSchemas.updateProfile }), async (req: any, res: Response) => {
   try {
     const result = await UserModel.updateProfile(req.user.id, req.body);
     if (result.rows.length === 0) {

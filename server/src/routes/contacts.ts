@@ -9,7 +9,7 @@ import { contactSchemas } from '../validations/schemas.js';
  * GET /api/contacts
  * Returns the current user's contacts list with last message + unread count.
  */
-router.get('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/', authenticateToken, async (req: any, res: Response) => {
   try {
     const result = await UserModel.getContacts(req.user.id);
     res.json(result.rows.map((c: any) => ({
@@ -31,7 +31,7 @@ router.post(
   '/find-by-email',
   authenticateToken,
   validate({ body: contactSchemas.findByEmail }),
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: any, res: Response) => {
     const { email } = req.body;
     try {
       const result = await UserModel.findByEmailPublic(email);
@@ -61,7 +61,7 @@ router.post(
   '/',
   authenticateToken,
   validate({ body: contactSchemas.add }),
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: any, res: Response) => {
     const { contactId } = req.body;
     try {
       // Verify target user exists
@@ -82,7 +82,7 @@ router.post(
  * DELETE /api/contacts/:contactId
  * Removes a user from the current user's contacts.
  */
-router.delete('/:contactId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.delete('/:contactId', authenticateToken, async (req: any, res: Response) => {
   const { contactId } = req.params;
   try {
     await UserModel.removeContact(req.user.id, contactId);

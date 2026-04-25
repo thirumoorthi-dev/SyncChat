@@ -1,13 +1,19 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    username: string;
-    email: string;
-  };
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        username: string;
+        email: string;
+      };
+    }
+  }
 }
+
+export interface AuthRequest extends Request {}
 
 /** Use this type in route handlers that are protected by `authenticateToken`. */
 export interface AuthenticatedRequest extends Request {
@@ -28,7 +34,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    req.user = decoded;
+    req.user = decoded as { id: string; username: string; email: string };
     next();
   } catch (error) {
     return res.status(403).json({ message: 'Invalid or expired token.' });

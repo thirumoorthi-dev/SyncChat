@@ -28,7 +28,7 @@ const router = express.Router();
 router.post('/block/:userId', 
   authenticateToken, 
   validate({ params: messageSchemas.idParam }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
   const { userId } = req.params;
   try {
     await BlockModel.blockUser(req.user.id, userId);
@@ -58,7 +58,7 @@ router.post('/block/:userId',
 router.delete('/block/:userId', 
   authenticateToken, 
   validate({ params: messageSchemas.idParam }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
   const { userId } = req.params;
   try {
     await BlockModel.unblockUser(req.user.id, userId);
@@ -84,7 +84,7 @@ router.delete('/block/:userId',
  *           application/json:
  *             schema: { type: array, items: { $ref: '#/components/schemas/User' } }
  */
-router.get('/blocks', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/blocks', authenticateToken, async (req: any, res: Response) => {
   try {
     const result = await BlockModel.getBlockedUsers(req.user.id);
     res.json(result.rows);
@@ -119,7 +119,7 @@ router.get('/blocks', authenticateToken, async (req: AuthRequest, res: Response)
 router.post('/archive', 
   authenticateToken, 
   validate({ body: managementSchemas.archive }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
   const { targetUserId, groupId } = req.body;
   try {
     await ArchiveModel.archiveChat(req.user.id, targetUserId, groupId);
@@ -153,7 +153,7 @@ router.post('/archive',
 router.post('/unarchive', 
   authenticateToken, 
   validate({ body: managementSchemas.archive }),
-  async (req: AuthRequest, res: Response) => {
+  async (req: any, res: Response) => {
   const { targetUserId, groupId } = req.body;
   try {
     await ArchiveModel.unarchiveChat(req.user.id, targetUserId, groupId);
@@ -185,7 +185,7 @@ router.post('/unarchive',
  *                   target_user_id: { type: string, format: uuid }
  *                   group_id: { type: string, format: uuid }
  */
-router.get('/archived', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/archived', authenticateToken, async (req: any, res: Response) => {
   try {
     const result = await ArchiveModel.getArchivedChats(req.user.id);
     res.json(result.rows);
