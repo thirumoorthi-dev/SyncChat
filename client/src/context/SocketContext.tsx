@@ -24,7 +24,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const newSocket = io('/', {
+    const baseUrl = import.meta.env.VITE_BASEURL as string;
+    const socketUrl = baseUrl && baseUrl.startsWith('http') ? new URL(baseUrl).origin : '/';
+
+    const newSocket = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
     });
