@@ -44,8 +44,7 @@ app.use(cookieParser());
 app.use('/api/', apiLimiter);
 app.use('/api/auth/', authLimiter);
 
-// Static files for uploads
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Local uploads are now served via Azure Blob Storage
 
 // Swagger UI
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

@@ -10,35 +10,57 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import { BlobServiceClient } from '@azure/storage-blob';
+import { v4 as uuidv4 } from 'uuid';
+
+const blobServiceClient = BlobServiceClient.fromConnectionString(
+  process.env.AZURE_STORAGE_CONNECTION_STRING || ''
+);
+
+const containerClient = blobServiceClient.getContainerClient(
+  process.env.AZURE_STORAGE_CONTAINER || 'uploads'
+);
+
 router.post('/', authenticateToken, upload.single('file'), async (req: AuthRequest, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded' });
   }
 
   try {
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const file = req.file;
+    const fileName = `${uuidv4()}-${file.originalname}`;
+    const blockBlobClient = containerClient.getBlockBlobClient(fileName);
+
+    await blockBlobClient.uploadData(file.buffer, {
+      blobHTTPHeaders: { blobContentType: file.mimetype },
+    });
+
+    const fileUrl = blockBlobClient.url;
     let thumbnail_url = null;
 
     // Check if the file is an image for thumbnail generation
-    const isImage = req.file.mimetype.startsWith('image/');
+    const isImage = file.mimetype.startsWith('image/');
     if (isImage) {
-      const thumbnailName = `thumb-${req.file.filename}`;
-      const thumbnailPath = path.join(__dirname, '../../uploads/thumbnails', thumbnailName);
-
-      await sharp(req.file.path)
+      const thumbnailName = `thumb-${fileName}`;
+      const thumbBuffer = await sharp(file.buffer)
         .resize(200, 200, { fit: 'inside' })
-        .toFile(thumbnailPath);
+        .toBuffer();
 
-      thumbnail_url = `/uploads/thumbnails/${thumbnailName}`;
+      const thumbBlobClient = containerClient.getBlockBlobClient(thumbnailName);
+      await thumbBlobClient.uploadData(thumbBuffer, {
+        blobHTTPHeaders: { blobContentType: file.mimetype },
+      });
+
+      thumbnail_url = thumbBlobClient.url;
     }
 
     res.json({
       media_url: fileUrl,
       media_thumbnail_url: thumbnail_url,
       message_type: isImage ? 'image' : 'file',
-      media_filename: req.file.originalname,
-      media_size_bytes: req.file.size,
-      media_mime_type: req.file.mimetype
+      media_filename: file.originalname,
+      media_size_bytes: file.size,
+      media_mime_type: file.mimetype
     });
   } catch (error) {
     console.error('Upload processing error:', error);
