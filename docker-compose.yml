@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: syncchat-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: chatapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  server:
+    build: ./server
+    container_name: syncchat-server
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      DATABASE_URL: postgresql://postgres:password@db:5432/chatapp
+      JWT_SECRET: pern_chat_super_secret_jwt_key_2024
+      REFRESH_TOKEN_SECRET: pern_chat_refresh_secret_key_2024
+      CLIENT_URL: http://localhost:3000
+    depends_on:
+      - db
+
+  client:
+    build: ./client
+    container_name: syncchat-client
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:

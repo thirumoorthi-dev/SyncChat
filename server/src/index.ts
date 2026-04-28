@@ -3,6 +3,7 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger.js';
 import initDatabase from './config/initDb.js';
@@ -15,6 +16,7 @@ import uploadRoutes from './routes/upload.js';
 import managementRoutes from './routes/management.js';
 import contactsRoutes from './routes/contacts.js';
 import { setupSocket } from './socket/socketHandler.js';
+import { apiLimiter, authLimiter } from './middleware/rateLimit.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -38,6 +40,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use(cookieParser());
+app.use('/api/', apiLimiter);
+app.use('/api/auth/', authLimiter);
 
 // Static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

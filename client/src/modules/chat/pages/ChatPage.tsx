@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import Sidebar from '../components/Sidebar';
 import ChatWindow from '../components/ChatWindow';
-import { ChatItem } from '../types/chat';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { setActiveChat } from '../store/chat.slice';
 
 const FEATURES = [
   { icon: '💬', title: 'Real-time messaging', desc: 'Instant delivery via WebSocket' },
@@ -70,7 +71,12 @@ function EmptyState() {
 }
 
 export default function ChatPage() {
-  const [activeChat, setActiveChat] = useState<ChatItem | null>(null);
+  const dispatch = useAppDispatch();
+  const activeChat = useAppSelector((state) => state.chat.activeChat);
+
+  const handleSelectChat = (chat: any) => {
+    dispatch(setActiveChat(chat));
+  };
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
@@ -78,7 +84,7 @@ export default function ChatPage() {
       <div
         className={`${activeChat ? 'hidden md:flex' : 'flex'} md:w-[340px] lg:w-[380px] w-full flex-col flex-shrink-0`}
       >
-        <Sidebar activeChat={activeChat} onSelectChat={setActiveChat} />
+        <Sidebar activeChat={activeChat} onSelectChat={handleSelectChat} />
       </div>
 
       {/* Chat Panel */}
@@ -87,7 +93,7 @@ export default function ChatPage() {
           <ChatWindow
             key={`${activeChat.type}-${activeChat.id}`}
             chat={activeChat}
-            onBack={() => setActiveChat(null)}
+            onBack={() => dispatch(setActiveChat(null))}
           />
         ) : (
           <EmptyState />

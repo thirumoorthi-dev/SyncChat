@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import Avatar from './Avatar';
-import { formatConversationTime } from '../utils/formatTime';
-import { ChatItem } from '../types/chat';
+import Avatar from '../../../shared/components/Avatar';
+import { formatConversationTime } from '../../../shared/utils/formatTime';
+import { ChatItem } from '../../../types/chat';
 
 interface ConversationItemProps {
   chat: ChatItem;

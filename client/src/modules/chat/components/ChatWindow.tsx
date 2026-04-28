@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
+import { useAppSelector } from '../../../app/hooks';
+import { useSocket } from '../../../context/SocketContext';
 import MessageBubble from './MessageBubble';
-import TypingIndicator from './TypingIndicator';
-import Avatar from './Avatar';
-import api from '../utils/api';
-import { formatLastSeen } from '../utils/formatTime';
+import TypingIndicator from '../../../shared/components/TypingIndicator';
+import Avatar from '../../../shared/components/Avatar';
+import api from '../../../app/services/axiosClient';
+import { formatLastSeen } from '../../../shared/utils/formatTime';
 import { isToday, isYesterday, format } from 'date-fns';
-import { ChatItem, Message, User } from '../types/chat';
+import { ChatItem, Message, User } from '../../../types/chat';
 
 // ── Date separator helper ──────────────────────────────────────────────────
 function getDateLabel(date: string) {
@@ -41,7 +41,7 @@ interface ChatWindowProps {
 }
 
 export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
-  const { user } = useAuth();
+  const { user } = useAppSelector((state) => state.auth);
   const { socket } = useSocket();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>('');
@@ -165,7 +165,7 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
       }
     };
     const handleNewGroupMessage = ({ groupId, message }: { groupId: string; message: Message }) => {
-      if (isGroup && parseInt(groupId) === chat.id) {
+      if (isGroup && groupId === chat.id) {
         setMessages(prev => {
           if (prev.find(m => m.id === message.id)) return prev;
           return [...prev, message];

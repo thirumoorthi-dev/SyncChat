@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import api from '../utils/api';
-import Avatar from './Avatar';
-import { User } from '../types/chat';
+import { useGetContactsQuery, useFindByEmailMutation, useAddContactMutation } from '../../contacts/api/contacts.api';
+import Avatar from '../../../shared/components/Avatar';
+import { User } from '../../../types/chat';
 
 interface NewChatModalProps {
   onClose: () => void;
@@ -13,27 +13,18 @@ export default function NewChatModal({ onClose, onSelectUser, onCreateGroup }: N
   const [tab, setTab] = useState<'direct' | 'group'>('direct');
   const [search, setSearch] = useState<string>('');
   
-  // State for 'direct' tab
+  // RTK Query
+  const { data: contacts = [], isLoading: loadingContacts } = useGetContactsQuery(undefined, {
+    skip: tab !== 'group',
+  });
+  const [findByEmail, { isLoading: loadingSearch }] = useFindByEmailMutation();
+  const [addContact, { isLoading: addingContact }] = useAddContactMutation();
+
   const [searchResult, setSearchResult] = useState<User & { is_contact?: boolean } | null>(null);
   const [searchError, setSearchError] = useState<string>('');
-  const [addingContact, setAddingContact] = useState<boolean>(false);
-
-  // State for 'group' tab
-  const [contacts, setContacts] = useState<User[]>([]);
+  
   const [groupName, setGroupName] = useState<string>('');
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
-  const [loadingContacts, setLoadingContacts] = useState<boolean>(false);
-  const [loadingSearch, setLoadingSearch] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (tab === 'group' && contacts.length === 0) {
-      setLoadingContacts(true);
-      api.get('/contacts')
-        .then(res => setContacts(res.data))
-        .catch(err => console.error('Error fetching contacts:', err))
-        .finally(() => setLoadingContacts(false));
-    }
-  }, [tab, contacts.length]);
 
   const handleSearchEmail = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -42,16 +33,13 @@ export default function NewChatModal({ onClose, onSelectUser, onCreateGroup }: N
       setSearchResult(null);
       return;
     }
-    setLoadingSearch(true);
     setSearchError('');
     setSearchResult(null);
     try {
-      const res = await api.post('/contacts/find-by-email', { email: search.trim() });
-      setSearchResult(res.data);
+      const result = await findByEmail(search.trim()).unwrap();
+      setSearchResult(result);
     } catch (err: any) {
-      setSearchError(err.response?.data?.message || 'Error searching for user.');
-    } finally {
-      setLoadingSearch(false);
+      setSearchError(err.data?.message || 'Error searching for user.');
     }
   };
 
@@ -61,14 +49,11 @@ export default function NewChatModal({ onClose, onSelectUser, onCreateGroup }: N
       onSelectUser(searchResult);
       return;
     }
-    setAddingContact(true);
     try {
-      await api.post('/contacts', { contactId: searchResult.id });
+      await addContact(searchResult.id).unwrap();
       onSelectUser(searchResult);
     } catch (err) {
       console.error('Error adding contact:', err);
-    } finally {
-      setAddingContact(false);
     }
   };
 

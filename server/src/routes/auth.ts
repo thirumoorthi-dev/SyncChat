@@ -51,13 +51,26 @@ router.post('/register', validate({ body: authSchemas.register }), async (req: e
     const result = await UserModel.create({ username, email, passwordHash });
     const user = result.rows[0];
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { id: user.id, username: user.username, email: user.email },
       process.env.JWT_SECRET || 'secret',
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id },
+      process.env.REFRESH_TOKEN_SECRET || 'refresh_secret',
       { expiresIn: '7d' }
     );
 
-    res.status(201).json({ token, user });
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    res.status(201).json({ token: accessToken, user });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ message: 'Server error during registration' });
@@ -108,18 +121,59 @@ router.post('/login', validate({ body: authSchemas.login }), async (req: express
 
     await UserModel.setOnlineStatus(user.id, true);
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { id: user.id, username: user.username, email: user.email },
       process.env.JWT_SECRET || 'secret',
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id },
+      process.env.REFRESH_TOKEN_SECRET || 'refresh_secret',
       { expiresIn: '7d' }
     );
 
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
     const { password_hash, ...safeUser } = user;
-    res.json({ token, user: { ...safeUser, is_online: true } });
+    res.json({ token: accessToken, user: { ...safeUser, is_online: true } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error during login' });
   }
+});
+
+router.post('/refresh', async (req: express.Request, res: Response) => {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken) return res.status(401).json({ message: 'No refresh token provided' });
+
+  try {
+    const payload: any = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET || 'refresh_secret');
+    const result = await UserModel.findById(payload.id);
+    if (result.rows.length === 0) return res.status(401).json({ message: 'User not found' });
+    const user = result.rows[0];
+
+    const accessToken = jwt.sign(
+      { id: user.id, username: user.username, email: user.email },
+      process.env.JWT_SECRET || 'secret',
+      { expiresIn: '15m' }
+    );
+
+    res.json({ token: accessToken });
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid refresh token' });
+  }
+});
+
+router.post('/logout', authenticateToken, async (req: AuthRequest, res: Response) => {
+  await UserModel.setOnlineStatus(req.user!.id, false);
+  res.clearCookie('refreshToken');
+  res.json({ message: 'Logged out successfully' });
 });
 
 /**

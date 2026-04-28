@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
+import { useAppSelector, useAppDispatch } from '../../../app/hooks';
+import { logout as logoutAction } from '../../auth/store/auth.slice';
+import { useSocket } from '../../../context/SocketContext';
 import ConversationItem from './ConversationItem';
 import NewChatModal from './NewChatModal';
-import ProfileModal from './ProfileModal';
-import Avatar from './Avatar';
-import ThemeToggle from './ThemeToggle';
-import api from '../utils/api';
-import { ChatItem, Conversation, Group, Message, User } from '../types/chat';
+import ProfileModal from '../../auth/components/ProfileModal';
+import Avatar from '../../../shared/components/Avatar';
+import ThemeToggle from '../../../shared/components/ThemeToggle';
+import api from '../../../app/services/axiosClient';
+import { ChatItem, Conversation, Group, Message, User } from '../../../types/chat';
 import { toast } from 'react-toastify';
 
 interface SidebarProps {
@@ -16,7 +17,9 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
-  const { user, logout } = useAuth();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const logout = () => dispatch(logoutAction());
   const { socket, isConnected } = useSocket();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { formatMessageTime } from '../utils/formatTime';
-import { Message } from '../types/chat';
+import { formatMessageTime } from '../../../shared/utils/formatTime';
+import { Message } from '../../../types/chat';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 

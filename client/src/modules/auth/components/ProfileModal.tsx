@@ -1,40 +1,40 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import api from '../utils/api';
-import Avatar from './Avatar';
+import { useAppSelector, useAppDispatch } from '../../../app/hooks';
+import { useUpdateProfileMutation } from '../api/auth.api';
+import { setUser } from '../store/auth.slice';
+import Avatar from '../../../shared/components/Avatar';
 
 interface ProfileModalProps {
   onClose: () => void;
 }
 
 export default function ProfileModal({ onClose }: ProfileModalProps) {
-  const { user, setUser } = useAuth();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const [updateProfile, { isLoading: loading }] = useUpdateProfileMutation();
+
   const [displayName, setDisplayName] = useState(user?.display_name || '');
   const [about, setAbout] = useState(user?.about || '');
   const [phoneNumber, setPhoneNumber] = useState(user?.phone_number || '');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
     setSuccess(false);
 
     try {
-      const res = await api.patch('/users/me', {
-        displayName: displayName.trim() || null,
-        about: about.trim() || null,
-        phoneNumber: phoneNumber.trim() || null
-      });
-      setUser(res.data);
+      const updatedUser = await updateProfile({
+        displayName: displayName.trim() || undefined,
+        about: about.trim() || undefined,
+        phoneNumber: phoneNumber.trim() || undefined
+      }).unwrap();
+      dispatch(setUser(updatedUser));
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update profile');
-    } finally {
-      setLoading(false);
+      setError(err.data?.message || 'Failed to update profile');
     }
   };
 
