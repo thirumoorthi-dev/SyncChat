@@ -37,6 +37,9 @@ export default function MessageBubble({
     onReaction?.(message, emoji);
   };
 
+  const VITE_BASEURL = import.meta.env.VITE_BASEURL as string;
+  const MEDIA_BASE = VITE_BASEURL && VITE_BASEURL.startsWith('http') ? new URL(VITE_BASEURL).origin : '';
+
   // Group reactions by emoji
   const reactionGroups = message.reactions?.reduce((acc: any, r: any) => {
     acc[r.reaction] = (acc[r.reaction] || 0) + 1;
@@ -131,9 +134,9 @@ export default function MessageBubble({
                 {/* Image Rendering */}
                 {message.message_type === 'image' && message.media_url && (
                   <div className="mb-2 overflow-hidden rounded-lg cursor-pointer bg-[var(--bg)] border border-[var(--border)] max-w-full">
-                    <a href={message.media_url} target="_blank" rel="noreferrer">
+                    <a href={`${MEDIA_BASE}${message.media_url}`} target="_blank" rel="noreferrer">
                       <img 
-                        src={message.media_thumbnail_url || message.media_url} 
+                        src={`${MEDIA_BASE}${message.media_thumbnail_url || message.media_url}`} 
                         alt="Shared media"
                         className="w-full h-auto object-cover max-h-[300px] hover:opacity-90 transition-opacity"
                         loading="lazy"
@@ -145,7 +148,7 @@ export default function MessageBubble({
                 {/* File Rendering */}
                 {message.message_type === 'file' && message.media_url && (
                   <a 
-                    href={message.media_url} 
+                    href={`${MEDIA_BASE}${message.media_url}`} 
                     target="_blank" 
                     rel="noreferrer"
                     className="flex items-center gap-3 p-3 mb-2 rounded-lg bg-[var(--bg)] hover:bg-[var(--hover)] transition-colors border border-[var(--border)]"
