@@ -10,6 +10,7 @@ export interface User {
   is_online: boolean;
   last_seen: string;
   created_at: string;
+  is_blocked: boolean;
 }
 
 export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'file' | 'location' | 'sticker';
@@ -71,6 +72,6 @@ export interface Conversation extends User {
   is_blocked: boolean;
 }
 
-export type ChatItem = 
-  | (Conversation & { type: 'direct' }) 
+export type ChatItem =
+  | (Conversation & { type: 'direct' })
   | (Group & { type: 'group' });

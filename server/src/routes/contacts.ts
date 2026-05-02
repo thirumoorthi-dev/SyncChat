@@ -4,6 +4,7 @@ import UserModel from '../models/user.model.js';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { contactSchemas } from '../validations/schemas.js';
+import { onlineUsers, getIO } from '../socket/socketHandler.js';
 
 /**
  * GET /api/contacts
@@ -69,7 +70,29 @@ router.post(
       if (target.rows.length === 0) {
         return res.status(404).json({ message: 'User not found' });
       }
+
+      // Add A → B contact
       await UserModel.addContact(req.user.id, contactId);
+
+      // Add B → A contact (bidirectional) so User B can also see and receive messages from User A
+      await UserModel.addContact(contactId, req.user.id);
+
+      // Notify User B in real-time so their sidebar updates without a refresh
+      const io = getIO();
+      const targetSocketId = onlineUsers.get(contactId);
+      if (io && targetSocketId) {
+        // Fetch User A's public profile to send to User B
+        const userAProfile = await UserModel.getPublicProfile(req.user.id);
+        if (userAProfile.rows.length > 0) {
+          io.to(targetSocketId).emit('new_contact', {
+            ...userAProfile.rows[0],
+            unread_count: 0,
+            last_message: null,
+            last_message_time: null,
+          });
+        }
+      }
+
       res.status(201).json({ message: 'Contact added', contactId });
     } catch (err) {
       console.error('Add contact error:', err);

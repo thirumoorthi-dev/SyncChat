@@ -81,8 +81,8 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
 
     const handleNewGroupMessage = ({ groupId, message }: { groupId: string; message: Message }) => {
       setGroups(prev => prev.map(g => {
-        if (g.id !== parseInt(groupId)) return g;
-        const isActiveGroup = activeChat?.type === 'group' && activeChat?.id === parseInt(groupId);
+        if (g.id !== groupId) return g;
+        const isActiveGroup = activeChat?.type === 'group' && activeChat?.id === groupId;
         return {
           ...g,
           last_message: message.content,
@@ -96,7 +96,7 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
       ));
     };
 
-    const handleMessagesRead = ({ byUserId }: { byUserId: number }) => {
+    const handleMessagesRead = ({ byUserId }: { byUserId: string }) => {
       setConversations(prev => prev.map(c =>
         c.id === byUserId ? { ...c, unread_count: 0 } : c
       ));
@@ -104,8 +104,16 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
 
     const handleGroupMessagesRead = ({ groupId }: { groupId: string }) => {
       setGroups(prev => prev.map(g =>
-        g.id === parseInt(groupId) ? { ...g, unread_count: 0 } : g
+        g.id === groupId ? { ...g, unread_count: 0 } : g
       ));
+    };
+
+    // When another user adds YOU as a contact, add them to your sidebar instantly
+    const handleNewContact = (newContact: Conversation) => {
+      setConversations(prev => {
+        if (prev.find(c => c.id === newContact.id)) return prev; // already exists
+        return [{ ...newContact, unread_count: 0 } as Conversation, ...prev];
+      });
     };
 
     socket.on('new_message', handleNewMessage);
@@ -113,7 +121,8 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
     socket.on('new_group_message', handleNewGroupMessage);
     socket.on('messages_read', handleMessagesRead);
     socket.on('group_messages_read', handleGroupMessagesRead);
-    socket.on('user_online', ({ userId, isOnline }: { userId: number; isOnline: boolean }) => {
+    socket.on('new_contact', handleNewContact);
+    socket.on('user_online', ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
       setConversations(prev => prev.map(c =>
         c.id === userId ? { ...c, is_online: isOnline } : c
       ));
@@ -125,6 +134,7 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
       socket.off('new_group_message', handleNewGroupMessage);
       socket.off('messages_read', handleMessagesRead);
       socket.off('group_messages_read', handleGroupMessagesRead);
+      socket.off('new_contact', handleNewContact);
       socket.off('user_online');
     };
   }, [socket, user, activeChat, loadConversations]);
@@ -153,6 +163,16 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
 
   const handleSelectChat = (chat: ChatItem) => {
     onSelectChat(chat);
+    // Immediately clear unread badge — don't wait for the server socket round-trip
+    if (chat.type === 'direct') {
+      setConversations(prev =>
+        prev.map(c => c.id === chat.id ? { ...c, unread_count: 0 } : c)
+      );
+    } else {
+      setGroups(prev =>
+        prev.map(g => g.id === chat.id ? { ...g, unread_count: 0 } : g)
+      );
+    }
   };
 
   const handleArchiveChat = async (chat: ChatItem) => {
@@ -215,17 +235,25 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
     new Date(b.last_message_time || 0).getTime() - new Date(a.last_message_time || 0).getTime()
   );
 
-  const filtered = allChats.filter(c => {
-    const matchesSearch = (c.type === 'group' ? c.name : (c.display_name || c.username || '')).toLowerCase().includes(search.toLowerCase());
-    const archived = isChatArchived(c);
-    
-    if (search.trim()) return matchesSearch;
-    if (showArchived) return archived && matchesSearch;
-    return !archived && matchesSearch;
+  // ── Always visible: unarchived, non-blocked chats ────────────────────
+  const unarchivedChats = allChats.filter(c => {
+    const matchesSearch = (c.type === 'group' ? c.name : (c.display_name || c.username || ''))
+      .toLowerCase().includes(search.toLowerCase());
+    return !isChatArchived(c) && !isChatBlocked(c) && matchesSearch;
   });
 
+  // ── Only visible when toggle is on: archived chats ────────────────────
+  const archivedChats = allChats.filter(c => {
+    const matchesSearch = (c.type === 'group' ? c.name : (c.display_name || c.username || ''))
+      .toLowerCase().includes(search.toLowerCase());
+    return isChatArchived(c) && !isChatBlocked(c) && matchesSearch;
+  });
+
+  // ── Blocked users (for ProfileModal blocked contacts section) ─────
+  const blockedUsers = conversations.filter(c => blockedIds.includes(c.id));
+
   const totalUnread = allChats.reduce((sum, c) => {
-    if (isChatArchived(c)) return sum;
+    if (isChatArchived(c) || isChatBlocked(c)) return sum;
     return sum + (c.unread_count || 0);
   }, 0);
 
@@ -240,9 +268,8 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
           <div className="relative">
             <Avatar name={user?.username} color={user?.avatar_color} size="md" />
             <span
-              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--panel)] ${
-                isConnected ? 'bg-[var(--green)]' : 'bg-gray-400'
-              }`}
+              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--panel)] ${isConnected ? 'bg-[var(--green)]' : 'bg-gray-400'
+                }`}
               title={isConnected ? 'Connected' : 'Reconnecting…'}
             />
           </div>
@@ -279,7 +306,7 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
               style={{ color: 'var(--subtext)' }}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
               </svg>
             </button>
 
@@ -347,7 +374,7 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
       {/* ── Section label ── */}
       {!search && (
         <div className="px-4 pt-2 pb-1 flex items-center justify-between flex-shrink-0">
-          <button 
+          <button
             onClick={() => setShowArchived(!showArchived)}
             className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest transition-colors hover:text-[var(--teal)]"
             style={{ color: showArchived ? 'var(--teal)' : 'var(--subtext)' }}
@@ -363,23 +390,24 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
         </div>
       )}
 
-      {/* ── Conversation List ── */}
+      {/* ── Conversation List (always visible) ── */}
       <div className="flex-1 overflow-y-auto">
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-6">
+        {/* Regular chats — always shown */}
+        {unarchivedChats.length === 0 && !showArchived ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center p-6">
             <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
               {search ? 'No results found' : 'No conversations yet'}
             </p>
           </div>
         ) : (
-          filtered.map(chatItem => (
+          unarchivedChats.map(chatItem => (
             <ConversationItem
               key={`${chatItem.type}-${chatItem.id}`}
               chat={chatItem}
               isActive={activeChat?.id === chatItem.id && activeChat?.type === chatItem.type}
               onClick={() => handleSelectChat(chatItem)}
               currentUserId={user?.id}
-              isArchived={isChatArchived(chatItem)}
+              isArchived={false}
               onArchive={() => handleArchiveChat(chatItem)}
               onUnarchive={() => handleUnarchiveChat(chatItem)}
               onBlock={chatItem.type === 'direct' ? () => handleBlockUser(chatItem.id) : undefined}
@@ -387,6 +415,39 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
               onUnblock={chatItem.type === 'direct' ? () => handleUnblockUser(chatItem.id) : undefined}
             />
           ))
+        )}
+
+        {/* Archived chats — shown as a separate section below when toggled */}
+        {showArchived && (
+          <>
+            <div
+              className="px-4 py-2 text-[10px] font-semibold uppercase tracking-widest"
+              style={{ color: 'var(--subtext)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', background: 'var(--hover)' }}
+            >
+              📂 Archived Chats
+            </div>
+            {archivedChats.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-xs" style={{ color: 'var(--subtext)' }}>No archived chats</p>
+              </div>
+            ) : (
+              archivedChats.map(chatItem => (
+                <ConversationItem
+                  key={`${chatItem.type}-${chatItem.id}`}
+                  chat={chatItem}
+                  isActive={activeChat?.id === chatItem.id && activeChat?.type === chatItem.type}
+                  onClick={() => handleSelectChat(chatItem)}
+                  currentUserId={user?.id}
+                  isArchived={true}
+                  onArchive={() => handleArchiveChat(chatItem)}
+                  onUnarchive={() => handleUnarchiveChat(chatItem)}
+                  onBlock={chatItem.type === 'direct' ? () => handleBlockUser(chatItem.id) : undefined}
+                  isBlocked={isChatBlocked(chatItem)}
+                  onUnblock={chatItem.type === 'direct' ? () => handleUnblockUser(chatItem.id) : undefined}
+                />
+              ))
+            )}
+          </>
         )}
       </div>
 
@@ -401,7 +462,11 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
 
       {/* Profile Modal */}
       {showProfile && (
-        <ProfileModal onClose={() => setShowProfile(false)} />
+        <ProfileModal
+          onClose={() => setShowProfile(false)}
+          blockedUsers={blockedUsers}
+          onUnblock={handleUnblockUser}
+        />
       )}
     </div>
   );

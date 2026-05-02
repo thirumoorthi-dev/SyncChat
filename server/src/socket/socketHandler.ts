@@ -15,8 +15,14 @@ interface AuthenticatedSocket extends Socket {
 }
 
 const onlineUsers = new Map<string, string>(); // userId -> socketId
+let _io: Server | null = null;
+
+export function getIO(): Server | null {
+  return _io;
+}
 
 export function setupSocket(io: Server) {
+  _io = io; // store reference for use in routes
   // Auth middleware for socket
   io.use((socket: AuthenticatedSocket, next) => {
     const token = socket.handshake.auth.token;
