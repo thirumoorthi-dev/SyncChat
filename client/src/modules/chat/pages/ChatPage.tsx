@@ -3,6 +3,12 @@ import Sidebar from '../components/Sidebar';
 import ChatWindow from '../components/ChatWindow';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { setActiveChat } from '../store/chat.slice';
+import { requestNotificationPermission } from '../../../app/services/notification.service';
+import { useEffect, useState } from 'react';
+import { useSocket } from '../../../context/SocketContext';
+import CallModal from '../components/CallModal';
+import IncomingCallModal from '../components/IncomingCallModal';
+import { toast } from 'react-toastify';
 
 const FEATURES = [
   { icon: '💬', title: 'Real-time messaging', desc: 'Instant delivery via WebSocket' },
@@ -73,6 +79,65 @@ function EmptyState() {
 export default function ChatPage() {
   const dispatch = useAppDispatch();
   const activeChat = useAppSelector((state) => state.chat.activeChat);
+  const { socket } = useSocket();
+
+  const [incomingCall, setIncomingCall] = useState<any>(null);
+  const [outgoingCall, setOutgoingCall] = useState<any>(null);
+  const [activeCall, setActiveCall] = useState<any>(null);
+
+  useEffect(() => {
+    // Request notification permission on mount
+    requestNotificationPermission();
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleCallReceived = (data: any) => {
+      setIncomingCall(data);
+    };
+
+    const handleCallError = ({ message }: { message: string }) => {
+      toast.error(message);
+      setOutgoingCall(null);
+    };
+
+    socket.on('call_received', handleCallReceived);
+    socket.on('call_error', handleCallError);
+
+    return () => {
+      socket.off('call_received', handleCallReceived);
+      socket.off('call_error', handleCallError);
+    };
+  }, [socket]);
+
+  const startCall = (type: 'voice' | 'video') => {
+    if (!activeChat || activeChat.type === 'group') return;
+    setOutgoingCall({
+      targetUser: activeChat,
+      type
+    });
+  };
+
+  const handleAcceptCall = () => {
+    const caller = {
+      id: incomingCall.from,
+      username: incomingCall.fromName,
+      avatar_color: '#128c7e' // Fallback
+    };
+    setActiveCall({
+      targetUser: caller,
+      isIncoming: true,
+      initialOffer: incomingCall.offer,
+      type: incomingCall.type
+    });
+    setIncomingCall(null);
+  };
+
+  const handleRejectCall = () => {
+    socket?.emit('reject_call', { to: incomingCall.from });
+    setIncomingCall(null);
+  };
 
   const handleSelectChat = (chat: any) => {
     dispatch(setActiveChat(chat));
@@ -94,11 +159,44 @@ export default function ChatPage() {
             key={`${activeChat.type}-${activeChat.id}`}
             chat={activeChat}
             onBack={() => dispatch(setActiveChat(null))}
+            onStartCall={startCall}
           />
         ) : (
           <EmptyState />
         )}
       </div>
+
+      {/* Call Modals */}
+      {incomingCall && (
+        <IncomingCallModal
+          caller={{
+            username: incomingCall.fromName,
+            avatar_color: '#128c7e'
+          }}
+          type={incomingCall.type}
+          onAccept={handleAcceptCall}
+          onReject={handleRejectCall}
+        />
+      )}
+
+      {outgoingCall && (
+        <CallModal
+          targetUser={outgoingCall.targetUser}
+          isIncoming={false}
+          type={outgoingCall.type}
+          onEnd={() => setOutgoingCall(null)}
+        />
+      )}
+
+      {activeCall && (
+        <CallModal
+          targetUser={activeCall.targetUser}
+          isIncoming={true}
+          initialOffer={activeCall.initialOffer}
+          type={activeCall.type}
+          onEnd={() => setActiveCall(null)}
+        />
+      )}
     </div>
   );
 }

@@ -110,4 +110,82 @@ router.post('/direct/:userId',
   }
 });
 
+/**
+ * @swagger
+ * /api/messages/search:
+ *   get:
+ *     summary: Search messages in a chat
+ *     tags: [Messages]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: chatId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: isGroup
+ *         schema: { type: boolean, default: false }
+ *     responses:
+ *       200:
+ *         description: Search results
+ */
+router.get('/search', authenticateToken, async (req: any, res: Response) => {
+  const { q, chatId, isGroup } = req.query;
+  if (!q) return res.json([]);
+
+  try {
+    const result = await MessageModel.searchMessages(
+      req.user.id,
+      q as string,
+      chatId as string,
+      isGroup === 'true'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/messages/media/{chatId}:
+ *   get:
+ *     summary: Get shared media in a chat
+ *     tags: [Messages]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *       - in: query
+ *         name: isGroup
+ *         schema: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: List of media messages
+ */
+router.get('/media/:chatId', authenticateToken, async (req: any, res: Response) => {
+  const { chatId } = req.params;
+  const { isGroup } = req.query;
+
+  try {
+    const result = await MessageModel.getChatMedia(
+      req.user.id,
+      chatId,
+      isGroup === 'true'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get media error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 export default router;

@@ -8,6 +8,7 @@ export interface MessageRow {
   group_id?: string | null;
   content: string;
   is_read: boolean;
+  is_delivered: boolean;
   is_deleted: boolean;
   is_edited: boolean;
   replied_to_id?: string | null;
@@ -17,6 +18,7 @@ export interface MessageRow {
   parent_message_content?: string;
   parent_message_sender?: string;
   reactions?: any[];
+  group_name?: string;
   media_url?: string | null;
   media_mime_type?: string | null;
   media_size_bytes?: string | number | null;
@@ -142,6 +144,7 @@ const MessageModel = {
       `SELECT m.*,
         u.username AS sender_username,
         u.avatar_color AS sender_avatar_color,
+        g.name AS group_name,
         pm.content AS parent_message_content,
         pu.username AS parent_message_sender,
         (SELECT json_agg(json_build_object('reaction', r.reaction, 'user_id', r.user_id, 'username', ru.username))
@@ -150,6 +153,7 @@ const MessageModel = {
          WHERE r.message_id = m.id) AS reactions
        FROM messages m
        JOIN users u ON u.id = m.sender_id
+       LEFT JOIN groups g ON g.id = m.group_id
        LEFT JOIN messages pm ON pm.id = m.replied_to_id
        LEFT JOIN users pu ON pu.id = pm.sender_id
        WHERE m.id = $1`,
@@ -163,9 +167,24 @@ const MessageModel = {
 
   markDirectMessagesAsRead(receiverId: string, senderId: string): Promise<QueryResult> {
     return pool.query(
-      `UPDATE messages SET is_read = TRUE
+      `UPDATE messages SET is_read = TRUE, is_delivered = TRUE
        WHERE receiver_id = $1 AND sender_id = $2 AND is_read = FALSE AND group_id IS NULL`,
       [receiverId, senderId]
+    );
+  },
+
+  markMessagesAsDelivered(messageId: string): Promise<QueryResult> {
+    return pool.query(
+      `UPDATE messages SET is_delivered = TRUE WHERE id = $1`,
+      [messageId]
+    );
+  },
+
+  markAllDirectMessagesAsDelivered(receiverId: string): Promise<QueryResult> {
+    return pool.query(
+      `UPDATE messages SET is_delivered = TRUE 
+       WHERE receiver_id = $1 AND is_delivered = FALSE AND group_id IS NULL`,
+      [receiverId]
     );
   },
 
@@ -197,6 +216,40 @@ const MessageModel = {
          )`,
       [groupId, userId]
     );
+  },
+
+  searchMessages(userId: string, query: string, chatId: string, isGroup: boolean): Promise<QueryResult<MessageRow>> {
+    const searchPattern = `%${query}%`;
+    let sql = `SELECT m.*, u.username AS sender_username, u.avatar_color AS sender_avatar_color
+               FROM messages m
+               JOIN users u ON u.id = m.sender_id
+               WHERE m.content ILIKE $1 AND m.is_deleted = FALSE`;
+    
+    if (isGroup) {
+      sql += ` AND m.group_id = $2`;
+    } else {
+      sql += ` AND m.group_id IS NULL AND ((m.sender_id = $2 AND m.receiver_id = $3) OR (m.sender_id = $3 AND m.receiver_id = $2))`;
+    }
+    
+    sql += ` ORDER BY m.created_at DESC LIMIT 50`;
+    
+    return isGroup ? pool.query(sql, [searchPattern, chatId]) : pool.query(sql, [searchPattern, userId, chatId]);
+  },
+
+  getChatMedia(userId: string, chatId: string, isGroup: boolean): Promise<QueryResult<MessageRow>> {
+    let sql = `SELECT * FROM messages 
+               WHERE (message_type IN ('image', 'video', 'file')) 
+                 AND is_deleted = FALSE`;
+    
+    if (isGroup) {
+      sql += ` AND group_id = $1`;
+    } else {
+      sql += ` AND group_id IS NULL AND ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))`;
+    }
+    
+    sql += ` ORDER BY created_at DESC LIMIT 100`;
+    
+    return isGroup ? pool.query(sql, [chatId]) : pool.query(sql, [userId, chatId]);
   },
 };
 

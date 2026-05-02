@@ -92,6 +92,14 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+.highlight-flash {
+  animation: highlightFlash 2s ease-out;
+}
+@keyframes highlightFlash {
+  0%   { background-color: rgba(18, 140, 126, 0.3); }
+  100% { background-color: transparent; }
+}
+
 /* Bubble tails */
 .bubble-sent {
   background: var(--sent);

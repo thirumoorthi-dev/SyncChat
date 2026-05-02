@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS messages (
   deleted_at           TIMESTAMP,
   is_edited            BOOLEAN      DEFAULT FALSE,
   edited_at            TIMESTAMP,
+  is_delivered         BOOLEAN      DEFAULT FALSE,
   created_at           TIMESTAMP    DEFAULT NOW(),
   CHECK (
     (receiver_id IS NOT NULL AND group_id IS NULL) OR

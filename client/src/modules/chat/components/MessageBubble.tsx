@@ -20,6 +20,9 @@ interface MessageBubbleProps {
   onEdit?: (msg: Message) => void;
   onDelete?: (msg: Message) => void;
   onReaction?: (msg: Message, emoji: string) => void;
+  onForward?: (msg: Message) => void;
+  onMediaClick?: (url: string, type: 'image' | 'video' | 'document') => void;
+  highlight?: string;
 }
 
 export default function MessageBubble({
@@ -29,7 +32,10 @@ export default function MessageBubble({
   onReply,
   onEdit,
   onDelete,
-  onReaction
+  onReaction,
+  onForward,
+  onMediaClick,
+  highlight
 }: MessageBubbleProps) {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -45,6 +51,22 @@ export default function MessageBubble({
     acc[r.reaction] = (acc[r.reaction] || 0) + 1;
     return acc;
   }, {});
+
+  const highlightText = (text: string, highlight?: string) => {
+    if (!highlight || !highlight.trim()) return text;
+    const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+    return (
+      <span>
+        {parts.map((part, i) =>
+          part.toLowerCase() === highlight.toLowerCase() ? (
+            <mark key={i} className="bg-[var(--teal)] text-white rounded-sm px-0.5">{part}</mark>
+          ) : (
+            part
+          )
+        )}
+      </span>
+    );
+  };
 
   return (
     <div className={`flex message-bubble group ${isOwn ? 'justify-end' : 'justify-start'} px-3 py-0.5`}>
@@ -74,6 +96,7 @@ export default function MessageBubble({
                       <button onClick={() => { onDelete?.(message); setShowMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-red-500">Delete</button>
                     </>
                   )}
+                  <button onClick={() => { onForward?.(message); setShowMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)]" style={{ color: 'var(--text)' }}>Forward</button>
                 </div>
               )}
             </div>
@@ -133,25 +156,23 @@ export default function MessageBubble({
               <>
                 {/* Image Rendering */}
                 {message.message_type === 'image' && message.media_url && (
-                  <div className="mb-2 overflow-hidden rounded-lg cursor-pointer bg-[var(--bg)] border border-[var(--border)] max-w-full">
-                    <a href={message.media_url} target="_blank" rel="noreferrer">
-                      <img 
-                        src={message.media_thumbnail_url || message.media_url} 
-                        alt="Shared media"
-                        className="w-full h-auto object-cover max-h-[300px] hover:opacity-90 transition-opacity"
-                        loading="lazy"
-                      />
-                    </a>
+                  <div 
+                    onClick={() => onMediaClick?.(message.media_url!, 'image')}
+                    className="mb-2 overflow-hidden rounded-lg cursor-pointer bg-[var(--bg)] border border-[var(--border)] max-w-full"
+                  >
+                    <img 
+                      src={message.media_thumbnail_url || message.media_url} 
+                      alt="Shared media"
+                      className="w-full h-auto object-cover max-h-[300px] hover:opacity-90 transition-opacity"
+                      loading="lazy"
+                    />
                   </div>
                 )}
 
-                {/* File Rendering */}
                 {message.message_type === 'file' && message.media_url && (
-                  <a 
-                    href={message.media_url} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="flex items-center gap-3 p-3 mb-2 rounded-lg bg-[var(--bg)] hover:bg-[var(--hover)] transition-colors border border-[var(--border)]"
+                  <div 
+                    onClick={() => onMediaClick?.(message.media_url!, 'document')}
+                    className="flex items-center gap-3 p-3 mb-2 rounded-lg bg-[var(--bg)] hover:bg-[var(--hover)] transition-colors border border-[var(--border)] cursor-pointer"
                   >
                     <div className="w-10 h-10 rounded bg-[var(--teal)] flex items-center justify-center flex-shrink-0 text-white shadow-sm">
                       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -169,13 +190,13 @@ export default function MessageBubble({
                     <svg className="w-4 h-4 text-[var(--subtext)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                  </a>
+                  </div>
                 )}
 
                 {/* Text Content */}
                 {message.content && (
                   <p className="text-sm leading-relaxed break-words" style={{ color: 'var(--text)' }}>
-                    {message.content}
+                    {highlightText(message.content, highlight)}
                   </p>
                 )}
               </>
@@ -207,19 +228,24 @@ export default function MessageBubble({
               {formatMessageTime(message.created_at)}
             </span>
             {isOwn && (
-              <svg
-                className={`w-[14px] h-[14px] flex-shrink-0 ${message.is_read ? 'text-blue-400' : ''}`}
-                style={{ color: message.is_read ? '#53BDEB' : 'var(--subtext)' }}
-                fill="currentColor"
-                viewBox="0 0 16 15"
-                aria-label={message.is_read ? 'Read' : 'Delivered'}
-              >
+              <span className="flex-shrink-0 flex items-center">
                 {message.is_read ? (
-                  <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.503zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
+                  /* Double Tick - Blue (Read) */
+                  <svg className="w-[15px] h-[15px]" style={{ color: '#53BDEB' }} fill="currentColor" viewBox="0 0 16 15">
+                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.503zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" />
+                  </svg>
+                ) : message.is_delivered ? (
+                  /* Double Tick - Grey (Delivered) */
+                  <svg className="w-[15px] h-[15px]" style={{ color: 'var(--subtext)' }} fill="currentColor" viewBox="0 0 16 15">
+                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.503zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" />
+                  </svg>
                 ) : (
-                  <path d="M10.91 3.316l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
+                  /* Single Tick - Grey (Sent) */
+                  <svg className="w-[14px] h-[14px]" style={{ color: 'var(--subtext)' }} fill="currentColor" viewBox="0 0 16 15">
+                    <path d="M10.91 3.316l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" />
+                  </svg>
                 )}
-              </svg>
+              </span>
             )}
           </div>
         </div>

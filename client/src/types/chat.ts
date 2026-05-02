@@ -34,6 +34,7 @@ export interface Message {
   sender_username: string;
   sender_avatar_color: string;
   is_read: boolean;
+  is_delivered: boolean;
   is_deleted: boolean;
   deleted_at?: string;
   is_edited: boolean;
@@ -62,6 +63,7 @@ export interface Group {
   last_message_sender_id?: string;
   created_at: string;
   is_blocked: boolean;
+  is_archived: boolean;
 }
 
 export interface Conversation extends User {

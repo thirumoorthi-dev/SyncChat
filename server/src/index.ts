@@ -15,6 +15,7 @@ import groupsRoutes from './routes/groups.js';
 import uploadRoutes from './routes/upload.js';
 import managementRoutes from './routes/management.js';
 import contactsRoutes from './routes/contacts.js';
+import notificationRoutes from './routes/notifications.js';
 import { setupSocket } from './socket/socketHandler.js';
 import { apiLimiter, authLimiter } from './middleware/rateLimit.js';
 import path from 'path';
@@ -81,6 +82,7 @@ app.use('/api/groups', groupsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/management', managementRoutes);
 app.use('/api/contacts', contactsRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
