@@ -48,7 +48,7 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [hasMore, setHasMore] = useState<boolean>(true);
-  const [typing, setTyping] = useState<{ username: string; userId: number } | null>(null);
+  const [typing, setTyping] = useState<{ username: string; userId: string } | null>(null);
   const [chatInfo, setChatInfo] = useState<ChatItem>(chat);
   const [showScrollFab, setShowScrollFab] = useState<boolean>(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -68,7 +68,7 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
-  const loadMessages = useCallback(async (beforeId: number | null = null) => {
+  const loadMessages = useCallback(async (beforeId: string | null = null) => {
     if (beforeId) setLoadingMore(true);
     else setLoading(true);
 
@@ -116,7 +116,7 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
     setInput('');
     setTyping(null);
     if (isGroup) {
-      api.get(`/groups/${chat.id}`).then(res => setChatInfo({ ...res.data, type: 'group', username: res.data.name })).catch(() => {});
+      api.get(`/groups/${chat.id}`).then(res => setChatInfo({ ...res.data, type: 'group', username: res.data.name })).catch(() => { });
     } else {
       setChatInfo(chat);
     }
@@ -173,32 +173,32 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
         socket?.emit('mark_group_read', { groupId: chat.id });
       }
     };
-    const handleTypingStart = (data: { userId: number; username: string; groupId?: number }) => {
+    const handleTypingStart = (data: { userId: string; username: string; groupId?: string }) => {
       if (data.userId === (user as User).id) return;
       if (!isGroup && data.userId === chat.id) setTyping({ username: data.username, userId: data.userId });
       if (isGroup && data.groupId === chat.id) setTyping({ username: data.username, userId: data.userId });
     };
-    const handleTypingStop = (data: { userId: number; groupId?: number }) => {
+    const handleTypingStop = (data: { userId: string; groupId?: string }) => {
       if (!isGroup && data.userId === chat.id) setTyping(null);
       if (isGroup && data.groupId === chat.id) setTyping(null);
     };
-    const handleMessagesRead = ({ byUserId }: { byUserId: number }) => {
+    const handleMessagesRead = ({ byUserId }: { byUserId: string }) => {
       if (!isGroup && byUserId === chat.id) {
         setMessages(prev => prev.map(m => ({ ...m, is_read: true })));
       }
     };
-    const handleUserOnline = ({ userId, isOnline }: { userId: number; isOnline: boolean }) => {
+    const handleUserOnline = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
       if (!isGroup && userId === chat.id) {
         setChatInfo(prev => ({ ...prev, is_online: isOnline }));
       }
     };
-    const handleMessageEdited = ({ messageId, content }: { messageId: number; content: string }) => {
+    const handleMessageEdited = ({ messageId, content }: { messageId: string; content: string }) => {
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content, is_edited: true } : m));
     };
-    const handleMessageDeleted = ({ messageId }: { messageId: number }) => {
+    const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: '', is_deleted: true } : m));
     };
-    const handleReactionUpdated = ({ messageId, reactions }: { messageId: number; reactions: any[] }) => {
+    const handleReactionUpdated = ({ messageId, reactions }: { messageId: string; reactions: any[] }) => {
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
     };
 
@@ -358,8 +358,13 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
         style={{ backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--border)' }}
       >
         <button
-          onClick={onBack}
-          className="md:hidden p-1.5 rounded-full hover:bg-[var(--hover)] transition-colors"
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onBack();
+          }}
+          className="md:hidden p-2 relative z-10 rounded-full hover:bg-[var(--hover)] transition-colors"
           style={{ color: 'var(--subtext)' }}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -374,7 +379,7 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
             {name}
           </h2>
           <p className="text-xs truncate"
-             style={{ color: (chatInfo as any).is_online && !isGroup ? 'var(--teal)' : 'var(--subtext)' }}>
+            style={{ color: (chatInfo as any).is_online && !isGroup ? 'var(--teal)' : 'var(--subtext)' }}>
             {typing ? (
               <span style={{ color: 'var(--teal)' }}>
                 {isGroup ? `${typing.username} is typing…` : 'typing…'}
@@ -404,53 +409,53 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
               </div>
             )}
             {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-6">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
-              style={{ background: 'rgba(18,140,126,0.1)' }}
-            >
-              <svg className="w-10 h-10" style={{ color: 'var(--teal)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>
-              No messages yet
-            </p>
-            <p className="text-xs" style={{ color: 'var(--subtext)' }}>
-              Say hi to {name}! 👋
-            </p>
-          </div>
-        ) : (
-          <>
-            {messageRows.map((row) => {
-              if (row.type === 'separator') {
-                return (
-                  <div key={row.id} className="date-sep">
-                    <span className="bg-[var(--panel)] px-3 py-0.5 rounded-full text-[10px]"
+              <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                <div
+                  className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
+                  style={{ background: 'rgba(18,140,126,0.1)' }}
+                >
+                  <svg className="w-10 h-10" style={{ color: 'var(--teal)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>
+                  No messages yet
+                </p>
+                <p className="text-xs" style={{ color: 'var(--subtext)' }}>
+                  Say hi to {name}! 👋
+                </p>
+              </div>
+            ) : (
+              <>
+                {messageRows.map((row) => {
+                  if (row.type === 'separator') {
+                    return (
+                      <div key={row.id} className="date-sep">
+                        <span className="bg-[var(--panel)] px-3 py-0.5 rounded-full text-[10px]"
                           style={{ color: 'var(--subtext)' }}>
-                      {row.label}
-                    </span>
-                  </div>
-                );
-              }
-              const { msg, showSender } = row;
-              return (
-                <MessageBubble
-                  key={msg.id}
-                  message={msg}
-                  isOwn={msg.sender_id === (user as User).id}
-                  showSender={showSender}
-                  onReply={handleReply}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onReaction={handleReaction}
-                />
-              );
-            })}
-            {typing && <TypingIndicator username={isGroup ? typing.username : null} />}
-            <div ref={messagesEndRef} />
-          </>
+                          {row.label}
+                        </span>
+                      </div>
+                    );
+                  }
+                  const { msg, showSender } = row;
+                  return (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      isOwn={msg.sender_id === (user as User).id}
+                      showSender={showSender}
+                      onReply={handleReply}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onReaction={handleReaction}
+                    />
+                  );
+                })}
+                {typing && <TypingIndicator username={isGroup ? typing.username : null} />}
+                <div ref={messagesEndRef} />
+              </>
             )}
           </>
         )}
@@ -487,8 +492,8 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
                 </span>
               </div>
             </div>
-            <button 
-              onClick={() => { setReplyingTo(null); setEditingMessage(null); if (editingMessage) setInput(''); }} 
+            <button
+              onClick={() => { setReplyingTo(null); setEditingMessage(null); if (editingMessage) setInput(''); }}
               className="p-1.5 rounded-full hover:bg-[var(--border)] transition-colors"
             >
               <svg className="w-4 h-4" style={{ color: 'var(--subtext)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -539,9 +544,8 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
             id="send-btn"
             onClick={() => sendMessage()}
             disabled={!input.trim()}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 ${
-              input.trim() ? 'scale-100 shadow-md' : 'scale-95 opacity-80'
-            }`}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 ${input.trim() ? 'scale-100 shadow-md' : 'scale-95 opacity-80'
+              }`}
             style={{
               background: input.trim()
                 ? 'linear-gradient(135deg, var(--teal), var(--dark))'
@@ -551,7 +555,7 @@ export default function ChatWindow({ chat, onBack }: ChatWindowProps) {
             }}
           >
             <svg className="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
             </svg>
           </button>
         </div>

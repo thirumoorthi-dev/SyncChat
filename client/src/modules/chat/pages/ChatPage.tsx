@@ -79,7 +79,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
+    <div className="flex h-[100dvh] overflow-hidden" style={{ background: 'var(--bg)' }}>
       {/* Sidebar */}
       <div
         className={`${activeChat ? 'hidden md:flex' : 'flex'} md:w-[340px] lg:w-[380px] w-full flex-col flex-shrink-0`}

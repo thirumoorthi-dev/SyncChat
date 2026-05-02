@@ -11,3 +11,12 @@ Thumbs.db
 # Orchids platform files (internal tooling - not for repo)
 .orchids/
 /server/uploads
+
+# ── Playwright E2E test output (auto-generated, not needed in repo) ─────────
+/client/test-results/
+/client/playwright-report/
+/client/e2e/screenshots/
+/client/.playwright/
+
+# ── Vitest UI cache ──────────────────────────────────────────────────────────
+/client/.vitest-cache/
