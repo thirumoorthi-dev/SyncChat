@@ -37,10 +37,10 @@ export default function CallModal({ targetUser, isIncoming, initialOffer, type, 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
+    if (localVideoRef.current && localStream && !isCameraOff) {
       localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream]);
+  }, [localStream, isCameraOff]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {

@@ -25,19 +25,19 @@ const router = express.Router();
  *     responses:
  *       200: { description: User blocked }
  */
-router.post('/block/:userId', 
-  authenticateToken, 
+router.post('/block/:userId',
+  authenticateToken,
   validate({ params: messageSchemas.idParam }),
   async (req: any, res: Response) => {
-  const { userId } = req.params;
-  try {
-    await BlockModel.blockUser(req.user.id, userId);
-    res.json({ message: 'User blocked' });
-  } catch (err) {
-    console.error('Block error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    const { userId } = req.params;
+    try {
+      await BlockModel.blockUser(req.user.id, userId);
+      res.json({ message: 'User blocked' });
+    } catch (err) {
+      console.error('Block error:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 
 /**
  * @swagger
@@ -55,19 +55,19 @@ router.post('/block/:userId',
  *     responses:
  *       200: { description: User unblocked }
  */
-router.delete('/block/:userId', 
-  authenticateToken, 
+router.delete('/block/:userId',
+  authenticateToken,
   validate({ params: messageSchemas.idParam }),
   async (req: any, res: Response) => {
-  const { userId } = req.params;
-  try {
-    await BlockModel.unblockUser(req.user.id, userId);
-    res.json({ message: 'User unblocked' });
-  } catch (err) {
-    console.error('Unblock error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    const { userId } = req.params;
+    try {
+      await BlockModel.unblockUser(req.user.id, userId);
+      res.json({ message: 'User unblocked' });
+    } catch (err) {
+      console.error('Unblock error:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 
 /**
  * @swagger
@@ -116,19 +116,19 @@ router.get('/blocks', authenticateToken, async (req: any, res: Response) => {
  *     responses:
  *       200: { description: Chat archived }
  */
-router.post('/archive', 
-  authenticateToken, 
+router.post('/archive',
+  authenticateToken,
   validate({ body: managementSchemas.archive }),
   async (req: any, res: Response) => {
-  const { targetUserId, groupId } = req.body;
-  try {
-    await ArchiveModel.archiveChat(req.user.id, targetUserId, groupId);
-    res.json({ message: 'Chat archived' });
-  } catch (err) {
-    console.error('Archive error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    const { targetUserId, groupId } = req.body;
+    try {
+      await ArchiveModel.archiveChat(req.user.id, targetUserId, groupId);
+      res.json({ message: 'Chat archived' });
+    } catch (err) {
+      console.error('Archive error:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 
 /**
  * @swagger
@@ -150,19 +150,19 @@ router.post('/archive',
  *     responses:
  *       200: { description: Chat unarchived }
  */
-router.post('/unarchive', 
-  authenticateToken, 
+router.post('/unarchive',
+  authenticateToken,
   validate({ body: managementSchemas.archive }),
   async (req: any, res: Response) => {
-  const { targetUserId, groupId } = req.body;
-  try {
-    await ArchiveModel.unarchiveChat(req.user.id, targetUserId, groupId);
-    res.json({ message: 'Chat unarchived' });
-  } catch (err) {
-    console.error('Unarchive error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    const { targetUserId, groupId } = req.body;
+    try {
+      await ArchiveModel.unarchiveChat(req.user.id, targetUserId, groupId);
+      res.json({ message: 'Chat unarchived' });
+    } catch (err) {
+      console.error('Unarchive error:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 
 /**
  * @swagger
@@ -185,14 +185,41 @@ router.post('/unarchive',
  *                   target_user_id: { type: string, format: uuid }
  *                   group_id: { type: string, format: uuid }
  */
-router.get('/archived', authenticateToken, async (req: any, res: Response) => {
-  try {
-    const result = await ArchiveModel.getArchivedChats(req.user.id);
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Get archived error:', err);
-    res.status(500).json({ message: 'Server error' });
+
+
+/**
+ * @swagger
+ * /api/management/ice-servers:
+ *   get:
+ *     summary: Get ICE servers (STUN/TURN) for WebRTC
+ *     tags: [Management]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of ICE servers
+ */
+router.get('/ice-servers', authenticateToken, async (req: any, res: Response) => {
+  const METERED_SECRET = process.env.METERED_SECRET_KEY;
+
+  if (METERED_SECRET) {
+    try {
+      // Fetch dynamic TURN credentials from Metered.ca
+      const response = await fetch(`https://syncchat.metered.ca/api/v1/turn/credentials?apiKey=${METERED_SECRET}`);
+      const iceServers = await response.json();
+      return res.json(iceServers);
+    } catch (err) {
+      console.error('Metered.ca fetch error:', err);
+      // Fallback to STUN if Metered fails
+    }
   }
+
+  // Fallback to public STUN servers
+  res.json([
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }
+  ]);
 });
 
 export default router;

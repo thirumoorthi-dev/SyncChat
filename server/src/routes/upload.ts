@@ -108,9 +108,12 @@ router.post('/', authenticateToken, upload.single('file'), async (req: AuthReque
       media_size_bytes: file.size,
       media_mime_type: file.mimetype,
     });
-  } catch (error) {
-    console.error('Upload processing error:', error);
-    res.status(500).json({ message: 'Error processing upload' });
+  } catch (error: any) {
+    console.error('[CRITICAL] Upload processing error:', error);
+    res.status(500).json({ 
+      message: 'Error processing upload', 
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Storage configuration issue' 
+    });
   }
 });
 
