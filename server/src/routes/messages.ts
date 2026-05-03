@@ -49,8 +49,8 @@ router.get('/direct/:userId',
     // result.rows is ordered by ID DESC, so for the client we reverse it to be chronological
     res.json(result.rows.reverse());
   } catch (error) {
-    console.error('Get messages error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error(`[CRITICAL] Get messages error (user: ${req.user.id}, target: ${userId}):`, error);
+    res.status(500).json({ message: 'Server error', details: process.env.NODE_ENV === 'development' ? error : undefined });
   }
 });
 

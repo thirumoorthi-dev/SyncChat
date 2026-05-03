@@ -86,8 +86,8 @@ export default function ChatPage() {
   const [activeCall, setActiveCall] = useState<any>(null);
 
   useEffect(() => {
-    // Request notification permission on mount
-    requestNotificationPermission();
+    // We no longer request notification permission on mount to avoid browser violations.
+    // Permission should be requested in response to a user gesture.
   }, []);
 
   useEffect(() => {

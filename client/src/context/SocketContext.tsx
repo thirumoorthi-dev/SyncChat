@@ -46,10 +46,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       console.error('Socket connection error:', err.message);
     });
 
-    // [Phase 2C] Browser Notification Request
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+    // Notification permission request removed from here to avoid [Violation]
+    // Only request in response to a user gesture.
 
     // [Phase 2C] Global Notification Listener
     const handleNotification = (data: any) => {
