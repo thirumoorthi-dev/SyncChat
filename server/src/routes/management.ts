@@ -185,7 +185,15 @@ router.post('/unarchive',
  *                   target_user_id: { type: string, format: uuid }
  *                   group_id: { type: string, format: uuid }
  */
-
+router.get('/archived', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const result = await ArchiveModel.getArchivedChats(req.user.id);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get archived error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 /**
  * @swagger
