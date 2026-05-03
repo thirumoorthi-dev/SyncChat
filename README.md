@@ -13,7 +13,24 @@
 
 **SyncChat** is a state-of-the-art, full-stack messaging platform. It delivers a premium communication experience with real-time text, voice/video calls, push notifications, and PWA support, all wrapped in a sleek, responsive interface.
 
-[Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started) • [API Reference](#-api-reference) • [Socket Events](#-real-time-socket-events) • [Project Structure](#-project-structure)
+[Features](#-features) • [Screenshots](#-screenshots) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started) • [API Reference](#-api-reference) • [Socket Events](#-real-time-socket-events) • [Project Structure](#-project-structure)
+
+</div>
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+### 🔐 Login & 💬 Real-time Chat
+<img src="./client/public/screenshots/login.png" width="45%" /> <img src="./client/public/screenshots/chat_main.png" width="45%" />
+
+### 🖇️ Attachment Menu & 😀 Emoji Picker
+<img src="./client/public/screenshots/attachment_menu.png" width="45%" /> <img src="./client/public/screenshots/emoji_picker.png" width="45%" />
+
+### 👤 Contact Info & Shared Media
+<img src="./client/public/screenshots/contact_info.png" width="90%" />
 
 </div>
 
