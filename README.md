@@ -2,17 +2,18 @@
 
 # 💬 SyncChat
 
-### A WhatsApp-inspired Real-Time Chat Application
+### A Premium WhatsApp-inspired Real-Time Chat Platform
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Latest-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
 [![Socket.io](https://img.shields.io/badge/Socket.io-4.7-010101?style=for-the-badge&logo=socket.io&logoColor=white)](https://socket.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![PWA](https://img.shields.io/badge/PWA-Ready-FF69B4?style=for-the-badge&logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
+[![WebRTC](https://img.shields.io/badge/WebRTC-Active-blueviolet?style=for-the-badge&logo=webrtc&logoColor=white)](https://webrtc.org/)
 
-**SyncChat** is a full-stack, real-time messaging application built with modern web technologies. It features instant messaging, group chats, online presence indicators, typing indicators, and a polished WhatsApp-like experience.
+**SyncChat** is a state-of-the-art, full-stack messaging platform. It delivers a premium communication experience with real-time text, voice/video calls, push notifications, and PWA support, all wrapped in a sleek, responsive interface.
 
-[Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started) • [API Reference](#-api-reference) • [Project Structure](#-project-structure)
+[Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started) • [API Reference](#-api-reference) • [Socket Events](#-real-time-socket-events) • [Project Structure](#-project-structure)
 
 </div>
 
@@ -20,31 +21,30 @@
 
 ## ✨ Features
 
-### 💬 Messaging
-- **Real-time messaging** via WebSocket (Socket.io) — no page refresh needed
-- **Direct (1-on-1) chats** between users
-- **Group chats** — create groups, add members, and chat together
-- **Message read receipts** — know when your message has been seen
-- **Unread message count** displayed per conversation
+### 📞 Advanced Communication
+- **WebRTC 1-to-1 Calls**: High-quality Peer-to-Peer voice and video calls with a premium full-screen interface.
+- **Push Notifications**: Receive real-time alerts even when the app is closed, powered by Web-Push and VAPID.
+- **PWA Support**: Install SyncChat on your mobile or desktop as a native app with offline capabilities.
 
-### 👥 User Experience
-- **User authentication** — secure sign-up & login with JWT tokens
-- **Online/Offline status** — see who's currently active
-- **Typing indicators** — live "User is typing..." animation
-- **User search** — find other users by username or email
-- **User profiles** — display name, avatar color, about section, phone number
+### 💬 Messaging Excellence
+- **Real-time Messaging**: Instant delivery via Socket.io with typing indicators and online presence.
+- **Delivery Receipts**: Detailed message statuses — **Sent** (single tick), **Delivered** (double tick), and **Read** (blue double tick).
+- **Message Reactions**: Express yourself by adding emoji reactions to any message.
+- **Search & Discovery**: Powerful real-time message search with "jump-to-message" and temporary highlighting.
+- **Forwarding**: Easily share text and media messages with multiple recipients simultaneously.
 
-### 🎨 UI / Design
-- **WhatsApp-inspired layout** — sidebar with conversation list + main chat window
-- **Dark / Light mode toggle**
-- **Color-coded avatars** — unique per user with initials
-- **Responsive & modern** design using TailwindCSS
-- **Smooth animations** and hover effects
+### 🖼️ Media & UI
+- **Media Preview Lightbox**: Premium full-screen preview for images and videos with zoom and download options.
+- **Smart Attachment Menu**: WhatsApp-style menu for quick sharing of Photos, Videos, and Documents.
+- **Contact Info Panel**: Slide-in panel for user profiles, group details, and a dedicated **Shared Media Gallery**.
+- **Dark / Light Mode**: Fully optimized theme support for any environment.
+- **Responsive Design**: Tailored experience for both desktop and mobile devices.
 
-### 🔒 Security
-- **Password hashing** with bcryptjs
-- **JWT-based authentication** with protected routes
-- **CORS configured** for client-server communication
+### 👥 User Experience & Security
+- **User Authentication**: Secure sign-up & login with JWT tokens and bcrypt hashing.
+- **Online/Offline Status**: Real-time presence tracking.
+- **Typing Indicators**: Visual feedback when someone is composing a message.
+- **Block & Archive**: Advanced privacy controls to block users or archive chats.
 
 ---
 
@@ -53,25 +53,26 @@
 ### Frontend (Client)
 | Technology | Purpose |
 |---|---|
-| **React 18** | UI Framework |
-| **Vite** | Build tool & dev server |
-| **React Router v6** | Client-side routing |
-| **Socket.io Client** | Real-time WebSocket communication |
-| **Axios** | HTTP API requests |
-| **TailwindCSS** | Utility-first CSS styling |
-| **date-fns** | Date formatting |
+| **React 18** | Core UI Library |
+| **Vite** | Modern build tool and development server |
+| **Redux Toolkit** | Centralized state management |
+| **Vite PWA** | Service worker and manifest management |
+| **WebRTC API** | Direct Peer-to-Peer streaming |
+| **Socket.io Client** | Real-time event handling |
+| **TailwindCSS** | Utility-first responsive styling |
+| **Emoji Mart** | High-quality emoji picker |
+| **React Toastify** | Elegant notification popups |
 
 ### Backend (Server)
 | Technology | Purpose |
 |---|---|
-| **Node.js + Express** | REST API server |
-| **Socket.io** | WebSocket server for real-time events |
-| **PostgreSQL** | Relational database |
-| **pg (node-postgres)** | PostgreSQL client |
-| **JWT (jsonwebtoken)** | Authentication tokens |
-| **bcryptjs** | Password hashing |
-| **dotenv** | Environment variable management |
-| **nodemon** | Auto-restart during development |
+| **Node.js + Express** | REST API and WebSocket host |
+| **Socket.io** | Real-time bidirectional event engine |
+| **PostgreSQL** | Reliable relational database |
+| **Web-Push** | VAPID-based push notification delivery |
+| **JWT (jsonwebtoken)** | Stateless user authentication |
+| **Bcryptjs** | Secure password hashing |
+| **pg (node-postgres)** | Non-blocking PostgreSQL client |
 
 ---
 
@@ -80,54 +81,24 @@
 ```
 SyncChat/
 ├── client/                     # React Frontend (Vite)
-│   ├── public/
+│   ├── public/                 # Icons, PWA manifest, and static assets
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── Avatar.jsx          # User avatar with color initials
-│   │   │   ├── ChatWindow.jsx      # Main chat message area
-│   │   │   ├── ConversationItem.jsx# Single conversation in sidebar list
-│   │   │   ├── MessageBubble.jsx   # Individual message bubble
-│   │   │   ├── NewChatModal.jsx    # Modal to start new chat / create group
-│   │   │   ├── Sidebar.jsx         # Left panel with conversations list
-│   │   │   ├── ThemeToggle.jsx     # Dark/Light mode toggle button
-│   │   │   └── TypingIndicator.jsx # Animated typing dots
-│   │   ├── context/
-│   │   │   └── (auth & socket context)
-│   │   ├── pages/
-│   │   │   ├── ChatPage.jsx        # Main authenticated chat screen
-│   │   │   └── Login.jsx           # Login / Register page
-│   │   ├── utils/                  # Helper utilities
-│   │   ├── App.jsx                 # Root app with routing
-│   │   ├── main.jsx                # React entry point
-│   │   └── index.css               # Global styles
-│   ├── package.json
-│   ├── vite.config.js
-│   └── tailwind.config.js
-│
+│   │   ├── app/                # Redux store and global services
+│   │   ├── context/            # Auth and Socket context providers
+│   │   ├── modules/
+│   │   │   ├── chat/           # Chat logic, components (CallModal, Lightbox)
+│   │   │   └── auth/           # Login, Register, and Profile logic
+│   │   ├── shared/             # Reusable UI elements (Avatar, etc.)
+│   │   ├── types/              # TypeScript interfaces
+│   │   └── utils/              # Helper functions
 ├── server/                     # Node.js + Express Backend
 │   ├── src/
-│   │   ├── config/
-│   │   │   ├── db.js               # PostgreSQL connection pool
-│   │   │   └── initDb.js           # Auto DB schema initialization
-│   │   ├── middleware/
-│   │   │   └── auth.js             # JWT authentication middleware
-│   │   ├── models/
-│   │   │   ├── user.model.js       # User DB queries (CRUD + conversations)
-│   │   │   ├── message.model.js    # Message DB queries
-│   │   │   └── group.model.js      # Group DB queries
-│   │   ├── routes/
-│   │   │   ├── auth.js             # POST /api/auth/* (login, register)
-│   │   │   ├── users.js            # GET /api/users/* (profile, search)
-│   │   │   ├── messages.js         # GET/POST /api/messages/*
-│   │   │   └── groups.js           # GET/POST /api/groups/*
-│   │   ├── socket/
-│   │   │   └── socketHandler.js    # Socket.io event handlers
-│   │   └── index.js                # Express app entry point
-│   ├── .env.example                # Environment variable template
-│   └── package.json
-│
-├── .gitignore
-└── README.md
+│   │   ├── config/             # DB connection and schema
+│   │   ├── middleware/         # Auth guards and validation
+│   │   ├── models/             # Database access layer
+│   │   ├── routes/             # REST API endpoints (Messages, Groups, Notifications)
+│   │   ├── socket/             # Signalling and messaging handlers
+│   │   └── utils/              # Push notifications and error loggers
 ```
 
 ---
@@ -135,232 +106,152 @@ SyncChat/
 ## 🚀 Getting Started
 
 ### Prerequisites
-
-Make sure you have these installed:
-- **Node.js** v18 or higher → [Download](https://nodejs.org)
-- **PostgreSQL** v13 or higher → [Download](https://www.postgresql.org/download)
-- **Git** → [Download](https://git-scm.com)
-
----
+- **Node.js** v18 or higher
+- **PostgreSQL** v13 or higher
+- **Git**
 
 ### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/Thiru2115/SyncChat.git
 cd SyncChat
 ```
 
----
-
 ### 2. Setup the Database
-
-Open **pgAdmin** or **psql** and create a new database:
-
+Create a new database named `chatapp` in PostgreSQL. The application will handle table creation automatically on the first start.
 ```sql
 CREATE DATABASE chatapp;
 ```
 
-> The server will auto-create all required tables on first start via `initDb.js`.
-
----
-
-### 3. Configure the Server
-
+### 3. Server Configuration
 ```bash
 cd server
 cp .env.example .env
 ```
-
-Edit `.env` and fill in your values:
-
+Update `.env` with your credentials:
 ```env
 PORT=8000
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/chatapp
-JWT_SECRET=your_super_secret_jwt_key_here_make_it_long_and_random
+DATABASE_URL=postgresql://postgres:password@localhost:5432/chatapp
+JWT_SECRET=your_secret_key
 CLIENT_URL=http://localhost:5173
+VAPID_PUBLIC_KEY=your_key
+VAPID_PRIVATE_KEY=your_key
+VAPID_EMAIL=mailto:admin@syncchat.com
 ```
 
-> 💡 Set `JWT_SECRET` to a long, random string. You can generate one with:
-> ```bash
-> node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-> ```
-
----
-
-### 4. Install & Run the Server
-
+### 4. Run the Application
 ```bash
-# In the /server directory
+# In /server
+npm install
+npm run dev
+
+# In /client (new terminal)
 npm install
 npm run dev
 ```
-
-Server starts at: **http://localhost:8000**
-
----
-
-### 5. Install & Run the Client
-
-Open a **new terminal**:
-
-```bash
-cd client
-npm install
-npm run dev
-```
-
-Client starts at: **http://localhost:5173**
-
----
-
-### 6. Open the App
-
-Go to **http://localhost:5173** in your browser.
-- **Register** a new account
-- Open another tab / browser → register a second user
-- Start chatting in real-time! 🎉
+Open **http://localhost:5173** and start chatting!
 
 ---
 
 ## 📡 API Reference
 
-### Auth Routes `/api/auth`
-
+### 🔐 Authentication `/api/auth`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/auth/register` | Register a new user |
-| `POST` | `/api/auth/login` | Login and get JWT token |
+| `POST` | `/register` | Create a new user account |
+| `POST` | `/login` | Authenticate and receive JWT |
 
-### User Routes `/api/users` *(Protected)*
-
+### 👤 User Management `/api/users`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/users/me` | Get current user profile |
-| `PUT` | `/api/users/profile` | Update profile (name, avatar, about, phone) |
-| `GET` | `/api/users/search?q=query` | Search users by username/email |
-| `GET` | `/api/users/conversations` | Get all conversations with last message + unread count |
-| `GET` | `/api/users/:id/profile` | Get another user's public profile |
+| `GET` | `/me` | Get current user profile |
+| `PUT` | `/profile` | Update profile details (Name, About, etc.) |
+| `GET` | `/search` | Search for users by username or email |
+| `GET` | `/conversations` | Get user's conversation list with unread counts |
 
-### Message Routes `/api/messages` *(Protected)*
-
+### 💬 Messaging `/api/messages`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/messages/:userId` | Get direct message history with a user |
-| `POST` | `/api/messages` | Send a direct message |
+| `GET` | `/:userId` | Get 1-on-1 message history |
+| `POST` | `/` | Send a direct message |
+| `GET` | `/search` | Search message history globally |
+| `GET` | `/media/:id` | Get all shared media items for a chat |
 
-### Group Routes `/api/groups` *(Protected)*
-
+### 👥 Group Management `/api/groups`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/groups` | Get all groups the user belongs to |
-| `POST` | `/api/groups` | Create a new group |
-| `GET` | `/api/groups/:id/messages` | Get group message history |
-| `POST` | `/api/groups/:id/messages` | Send a message to a group |
+| `GET` | `/` | Get all groups user belongs to |
+| `POST` | `/` | Create a new group |
+| `GET` | `/:id/messages` | Get group message history |
 
-### Health Check
-
+### 🛡️ System & Management `/api/management`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/health` | Check server status |
+| `POST` | `/block` | Block a specific user |
+| `DELETE` | `/archive` | Unarchive a conversation |
+| `POST` | `/notifications/subscribe` | Register for Web Push notifications |
 
 ---
 
 ## ⚡ Real-Time Socket Events
 
-SyncChat uses **Socket.io** for all real-time communication.
+SyncChat leverages Socket.io for all bidirectional events, including the WebRTC signalling process.
 
 ### Client → Server
-
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `join` | `{ userId }` | Register user's socket connection |
-| `send_message` | `{ toUserId, message, groupId? }` | Send a real-time message |
-| `typing` | `{ toUserId, groupId? }` | Emit typing started |
-| `stop_typing` | `{ toUserId, groupId? }` | Emit typing stopped |
-| `mark_read` | `{ fromUserId }` | Mark messages as read |
+| `join` | `{ userId }` | Connect user to their personal room |
+| `send_message` | `{ to, message, type }` | Dispatch a text or media message |
+| `typing_start` | `{ to, groupId? }` | User started typing |
+| `call_user` | `{ to, offer, type }` | Initiate a WebRTC call |
+| `answer_call` | `{ to, answer }` | Respond to a WebRTC call |
 
 ### Server → Client
-
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `receive_message` | `{ message }` | Incoming new message |
-| `user_online` | `{ userId }` | A user came online |
-| `user_offline` | `{ userId }` | A user went offline |
-| `typing` | `{ fromUserId }` | Someone started typing |
-| `stop_typing` | `{ fromUserId }` | Someone stopped typing |
-| `messages_read` | `{ byUserId }` | Messages marked as read |
+| `receive_message`| `{ message }` | Incoming real-time message |
+| `user_online` | `{ userId }` | Contact has come online |
+| `call_received` | `{ from, offer, type }` | Incoming voice/video call |
+| `messages_read` | `{ byUserId }` | Contact has read your messages |
 
 ---
 
 ## 🎯 Key Features In-Depth
 
 ### Real-Time Architecture
-- The Express server and Socket.io share the **same HTTP server instance**
-- Each authenticated user joins a **personal socket room** on connection
-- Messages are delivered instantly via socket events, and also persisted to PostgreSQL
+The platform uses a unified Express and Socket.io instance to ensure data consistency. Every message is simultaneously persisted to PostgreSQL and broadcast to the relevant user rooms, ensuring no data loss even during network fluctuations.
 
-### Conversation List
-- Fetches all users the logged-in user has exchanged messages with
-- Shows **last message preview** and **timestamp**
-- Shows **unread count badge** for each conversation
+### WebRTC Signalling
+SyncChat implements a custom signalling protocol over WebSockets. It manages the exchange of ICE candidates and Session Descriptions (SDP) to establish secure, low-latency Peer-to-Peer media streams.
 
-### Group Chat
-- Create groups with a name and selected members
-- All group messages are broadcast to every member's socket room
-- Group conversations appear in the same sidebar alongside direct chats
-
----
-
-## 🔧 Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `8000` |
-| `DATABASE_URL` | PostgreSQL connection string | — |
-| `JWT_SECRET` | Secret key for signing JWT tokens | — |
-| `CLIENT_URL` | Frontend URL for CORS | `http://localhost:5173` |
+### Push Notification Logic
+When a user is offline, the server triggers a `web-push` notification using the VAPID protocol. This ensures that users are notified of new messages even when the PWA is closed or running in the background.
 
 ---
 
 ## 🚀 Available Scripts
 
 ### Server (`/server`)
-
-```bash
-npm run dev      # Start with nodemon (auto-restart on changes)
-npm start        # Start production server
-```
+- `npm run dev`: Start with `tsx watch` for auto-reloading.
+- `npm start`: Launch the production server.
 
 ### Client (`/client`)
-
-```bash
-npm run dev      # Start Vite dev server with HMR
-npm run build    # Build production bundle
-npm run preview  # Preview production build locally
-```
+- `npm run dev`: Launch Vite development server.
+- `npm run build`: Generate the production PWA bundle.
+- `npm run preview`: Test the production build locally.
 
 ---
 
 ## 🤝 Contributing
-
-Contributions are welcome! Feel free to:
-
-1. 🍴 Fork the repository
-2. 🌿 Create a feature branch: `git checkout -b feature/your-feature`
-3. 💾 Commit your changes: `git commit -m "feat: add your feature"`
-4. 📤 Push to the branch: `git push origin feature/your-feature`
-5. 🔁 Open a Pull Request
+Contributions are always welcome! Please fork the repository and use a feature branch.
 
 ---
 
 ## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License**.
 
 ---
 
 ## 👨‍💻 Author
-
 **Thiru** — [@Thiru2115](https://github.com/Thiru2115)
 
 ---
@@ -369,6 +260,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 **⭐ If you found this project helpful, please give it a star! ⭐**
 
-Made with ❤️ using React, Node.js, PostgreSQL & Socket.io
+Made with ❤️ using React, Node.js, PostgreSQL & WebRTC
 
 </div>
