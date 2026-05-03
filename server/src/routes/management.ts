@@ -209,17 +209,25 @@ router.get('/archived', authenticateToken, async (req: any, res: Response) => {
  */
 router.get('/ice-servers', authenticateToken, async (req: any, res: Response) => {
   const METERED_SECRET = process.env.METERED_SECRET_KEY;
+  const METERED_APP_NAME = process.env.METERED_APP_NAME;
 
-  if (METERED_SECRET) {
+  if (METERED_SECRET && METERED_APP_NAME) {
     try {
-      // Fetch dynamic TURN credentials from Metered.ca
-      const response = await fetch(`https://syncchat.metered.ca/api/v1/turn/credentials?apiKey=${METERED_SECRET}`);
-      const iceServers = await response.json();
-      return res.json(iceServers);
+      console.log(`[WebRTC] Fetching TURN credentials for app: ${METERED_APP_NAME}`);
+      // Fetch dynamic TURN credentials from Metered.live
+      const response = await fetch(`https://${METERED_APP_NAME}.metered.live/api/v1/turn/credentials?apiKey=${METERED_SECRET}`);
+      
+      if (response.ok) {
+        const iceServers = await response.json();
+        return res.json(iceServers);
+      } else {
+        console.error(`[WebRTC] Metered.ca API returned error: ${response.status}`);
+      }
     } catch (err) {
-      console.error('Metered.ca fetch error:', err);
-      // Fallback to STUN if Metered fails
+      console.error('[WebRTC] Metered.ca fetch error:', err);
     }
+  } else {
+    console.warn('[WebRTC] Metered credentials missing in .env (METERED_SECRET_KEY or METERED_APP_NAME)');
   }
 
   // Fallback to public STUN servers
