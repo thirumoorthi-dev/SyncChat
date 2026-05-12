@@ -14,6 +14,7 @@ interface ConversationItemProps {
   onBlock?: () => void;
   isBlocked?: boolean;
   onUnblock?: () => void;
+  onLeave?: () => void;
 }
 
 export default function ConversationItem({ 
@@ -27,6 +28,7 @@ export default function ConversationItem({
   onBlock ,
   isBlocked,
   onUnblock,
+  onLeave,
 }: ConversationItemProps) {
   const [showMenu, setShowMenu] = useState(false);
   const name = chat.type === 'group' ? chat.name : (chat.display_name || chat.username || '?');
@@ -46,11 +48,11 @@ export default function ConversationItem({
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
       className={`
-        slide-item group relative flex items-center gap-3 px-4 py-3 cursor-pointer
-        transition-colors duration-150
+        slide-item group relative flex items-center gap-3 px-3 py-3 cursor-pointer
+        transition-colors duration-150 border-b border-[var(--border)]
         ${isActive
-          ? 'bg-[var(--active-bg)] border-l-[3px] border-[var(--active-bar)]'
-          : 'hover:bg-[var(--hover)] border-l-[3px] border-transparent'}
+          ? 'bg-[#2a3942]'
+          : 'hover:bg-[#202c33]'}
       `}
     >
       {/* Avatar */}
@@ -107,19 +109,29 @@ export default function ConversationItem({
                         📁 Archive
                       </button>
                     )}
-                    {isBlocked ? (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); onUnblock?.(); setShowMenu(false); }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-green-500"
-                      >
-                        ✅ Unblock User
-                      </button>
+                    
+                    {!isGroup ? (
+                      isBlocked ? (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onUnblock?.(); setShowMenu(false); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-green-500"
+                        >
+                          ✅ Unblock User
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onBlock?.(); setShowMenu(false); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-red-500"
+                        >
+                          🚫 Block User
+                        </button>
+                      )
                     ) : (
                       <button 
-                        onClick={(e) => { e.stopPropagation(); onBlock?.(); setShowMenu(false); }}
+                        onClick={(e) => { e.stopPropagation(); onLeave?.(); setShowMenu(false); }}
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-red-500"
                       >
-                        🚫 Block User
+                        🚪 Leave Group
                       </button>
                     )}
                   </div>

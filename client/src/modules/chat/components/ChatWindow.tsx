@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import gsap from 'gsap';
 import { useAppSelector } from '../../../app/hooks';
 import { useSocket } from '../../../context/SocketContext';
 import MessageBubble from './MessageBubble';
@@ -81,6 +82,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
   const isTypingRef = useRef<boolean>(false);
   const prevScrollHeightRef = useRef<number>(0);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const attachmentMenuRef = useRef<HTMLDivElement>(null);
 
   const isGroup = chat.type === 'group';
   const name = isGroup ? (chatInfo as any).name : (chatInfo as any).display_name || (chatInfo as any).username;
@@ -151,15 +153,34 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
     scrollToBottom('auto');
   }, [messages, typing]);
 
+  useLayoutEffect(() => {
+    if (showEmojiPicker && emojiPickerRef.current) {
+      gsap.fromTo(emojiPickerRef.current, 
+        { opacity: 0, y: 20, scale: 0.9, transformOrigin: 'bottom left' },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.7)' }
+      );
+    }
+  }, [showEmojiPicker]);
+
+  useLayoutEffect(() => {
+    if (showAttachmentMenu && attachmentMenuRef.current) {
+      gsap.fromTo(attachmentMenuRef.current, 
+        { opacity: 0, y: 20, scale: 0.9, transformOrigin: 'bottom left' },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.7)' }
+      );
+    }
+  }, [showAttachmentMenu]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
         setShowEmojiPicker(false);
       }
       // Close attachment menu if clicked outside
-      // We check if it's not the plus button itself
+      // We check if it's not the plus button itself and not within the menu
       const plusBtn = document.querySelector('[data-plus-btn]');
-      if (showAttachmentMenu && plusBtn && !plusBtn.contains(event.target as Node)) {
+      const isInsideMenu = attachmentMenuRef.current?.contains(event.target as Node);
+      if (showAttachmentMenu && plusBtn && !plusBtn.contains(event.target as Node) && !isInsideMenu) {
         setShowAttachmentMenu(false);
       }
     };
@@ -517,7 +538,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
       {/* ── Header ── */}
       <div
         className="flex items-center gap-3 px-4 py-3 flex-shrink-0 shadow-sm z-20"
-        style={{ backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--border)' }}
+        style={{ backgroundColor: 'var(--header)', borderBottom: '1px solid var(--border)' }}
       >
         <button
           onClick={onBack}
@@ -570,13 +591,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
             </>
           )}
           <button
-            onClick={() => {
-              setIsSearching(!isSearching);
-              if (isSearching) {
-                setSearchQuery('');
-                setSearchResults([]);
-              }
-            }}
+            onClick={() => setIsSearching(!isSearching)}
             className="p-2 rounded-full hover:bg-[var(--hover)] transition-colors"
             style={{ color: isSearching ? 'var(--teal)' : 'var(--subtext)' }}
           >
@@ -778,7 +793,11 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                 </div>
               )}
 
-              <div className="flex items-end gap-2 px-4 py-3 relative">
+              {/* Input Area */}
+              <div 
+                className="flex items-end gap-2 px-4 py-3 relative"
+                style={{ backgroundColor: 'var(--received)' }}
+              >
                 {showEmojiPicker && (
                   <div ref={emojiPickerRef} className="absolute bottom-full left-4 z-50 mb-2 shadow-2xl">
                     <Picker
@@ -793,7 +812,8 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
 
                 {showAttachmentMenu && (
                   <div
-                    className="absolute bottom-full left-4 z-50 mb-4 bg-[var(--panel)] rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden animate-in slide-in-from-bottom-4 duration-200"
+                    ref={attachmentMenuRef}
+                    className="absolute bottom-full left-4 z-50 mb-4 bg-[var(--panel)] rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden"
                     style={{ width: '220px' }}
                   >
                     <div className="p-2 flex flex-col gap-1">
@@ -902,22 +922,21 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                   />
                 </div>
 
-                <button
+                 <button
                   id="send-btn"
-                  onClick={() => sendMessage()}
-                  disabled={!input.trim()}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 ${input.trim() ? 'scale-100 shadow-md' : 'scale-95 opacity-80'
-                    }`}
-                  style={{
-                    background: input.trim()
-                      ? 'linear-gradient(135deg, var(--teal), var(--dark))'
-                      : 'var(--border)',
-                    color: input.trim() ? '#fff' : 'var(--subtext)',
-                  }}
+                  onClick={() => input.trim() ? sendMessage() : null}
+                  className="w-11 h-11 flex items-center justify-center transition-all duration-200 flex-shrink-0"
+                  style={{ color: input.trim() ? 'var(--teal)' : 'var(--subtext)' }}
                 >
-                  <svg className="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                  </svg>
+                  {input.trim() ? (
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>

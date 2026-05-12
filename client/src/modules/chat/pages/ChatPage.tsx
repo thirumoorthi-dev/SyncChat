@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
+import gsap from 'gsap';
 import Sidebar from '../components/Sidebar';
 import ChatWindow from '../components/ChatWindow';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
@@ -18,13 +19,41 @@ const FEATURES = [
 ];
 
 function EmptyState() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (containerRef.current) {
+      const q = gsap.utils.selector(containerRef.current);
+      gsap.from(q('.logo-animate'), {
+        y: -50,
+        opacity: 0,
+        duration: 1,
+        ease: 'elastic.out(1, 0.75)'
+      });
+      gsap.from(q('.feature-card'), {
+        y: 30,
+        opacity: 0,
+        stagger: 0.1,
+        duration: 0.8,
+        delay: 0.2,
+        ease: 'power3.out'
+      });
+      gsap.from(q('.footer-animate'), {
+        opacity: 0,
+        duration: 1,
+        delay: 0.8
+      });
+    }
+  }, []);
+
   return (
     <div
+      ref={containerRef}
       className="flex flex-col items-center justify-center h-full text-center px-8 select-none"
       style={{ background: 'var(--bg)' }}
     >
       <div
-        className="w-28 h-28 rounded-full flex items-center justify-center mb-6 shadow-xl"
+        className="logo-animate w-28 h-28 rounded-full flex items-center justify-center mb-6 shadow-xl"
         style={{
           background: 'linear-gradient(135deg, rgba(18,140,126,0.15), rgba(37,211,102,0.1))',
           border: '2px solid rgba(18,140,126,0.2)',
@@ -53,7 +82,7 @@ function EmptyState() {
         {FEATURES.map(f => (
           <div
             key={f.icon}
-            className="flex flex-col items-start gap-1.5 p-3.5 rounded-xl text-left"
+            className="feature-card flex flex-col items-start gap-1.5 p-3.5 rounded-xl text-left transition-transform hover:scale-[1.02] cursor-default"
             style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}
           >
             <span className="text-xl">{f.icon}</span>
@@ -63,7 +92,7 @@ function EmptyState() {
         ))}
       </div>
 
-      <div className="flex items-center gap-1.5 mt-8">
+      <div className="footer-animate flex items-center gap-1.5 mt-8">
         <svg className="w-3.5 h-3.5" style={{ color: 'var(--subtext)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />

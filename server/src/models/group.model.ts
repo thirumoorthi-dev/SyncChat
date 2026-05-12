@@ -138,6 +138,13 @@ const GroupModel = {
       [userId]
     );
   },
+
+  removeMember(groupId: string, userId: string): Promise<QueryResult> {
+    return pool.query(
+      'DELETE FROM group_members WHERE group_id = $1 AND user_id = $2',
+      [groupId, userId]
+    );
+  },
 };
 
 export default GroupModel;
