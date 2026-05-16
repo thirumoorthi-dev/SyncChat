@@ -21,56 +21,94 @@ export function useWebRTC({ targetUserId, isIncoming, initialOffer, type, onEnd 
   const [isCameraOff, setIsCameraOff] = useState(type === 'voice');
 
   const peerConnection = useRef<RTCPeerConnection | null>(null);
+  const pendingCandidates = useRef<RTCIceCandidate[]>([]);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const [iceServers, setIceServers] = useState<any[] | null>(null);
+
+  // 1. Fetch ICE servers once on mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchIce = async () => {
+      try {
+        const res = await api.get('/management/ice-servers');
+        if (isMounted && res.data && Array.isArray(res.data)) {
+          setIceServers(res.data);
+        }
+      } catch (err) {
+        console.warn('[WebRTC] Failed to fetch ICE servers, using defaults:', err);
+        if (isMounted) {
+          setIceServers([
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]);
+        }
+      }
+    };
+    fetchIce();
+    return () => { isMounted = false; };
+  }, []);
+
+  const cleanup = useCallback(() => {
+    console.log('[WebRTC] Cleaning up connection');
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    if (peerConnection.current) {
+      peerConnection.current.ontrack = null;
+      peerConnection.current.onicecandidate = null;
+      peerConnection.current.onconnectionstatechange = null;
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+    pendingCandidates.current = [];
+    setLocalStream(null);
+    setRemoteStream(null);
+    setCallStatus('ended');
+  }, []);
 
   const endCall = useCallback(() => {
     socket?.emit('end_call', { to: targetUserId });
     cleanup();
     onEnd();
-  }, [socket, targetUserId, onEnd]);
+  }, [socket, targetUserId, onEnd, cleanup]);
 
-  const cleanup = () => {
-    localStream?.getTracks().forEach(track => track.stop());
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
-    setCallStatus('ended');
-  };
-
-  const setupPeerConnection = useCallback(async (stream: MediaStream, iceServers: any[]) => {
-    const pc = new RTCPeerConnection({ iceServers });
-
-    stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-    pc.ontrack = (event) => {
-      console.log('WebRTC: Remote track received');
-      setRemoteStream(event.streams[0]);
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket?.emit('ice_candidate', { to: targetUserId, candidate: event.candidate });
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log('WebRTC: Connection state changed to:', pc.connectionState);
-      if (pc.connectionState === 'connected') setCallStatus('active');
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        cleanup();
-        onEnd();
-      }
-    };
-
-    peerConnection.current = pc;
-    return pc;
-  }, [socket, targetUserId, onEnd]);
-
+  // 2. Main Call Setup Effect
   useEffect(() => {
-    let isInitialized = false;
+    if (!iceServers || !socket) return;
 
-    const init = async () => {
-      if (isInitialized) return;
+    let isMounted = true;
+
+    const handleAnswer = async ({ answer }: { answer: any }) => {
+      if (peerConnection.current) {
+        try {
+          await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+          while (pendingCandidates.current.length > 0) {
+            const candidate = pendingCandidates.current.shift();
+            if (candidate) await peerConnection.current.addIceCandidate(candidate);
+          }
+        } catch (err) { console.error('Handle answer error:', err); }
+      }
+    };
+
+    const handleCandidate = async ({ candidate }: { candidate: any }) => {
+      const iceCandidate = new RTCIceCandidate(candidate);
+      if (peerConnection.current?.remoteDescription) {
+        try { await peerConnection.current.addIceCandidate(iceCandidate); } 
+        catch (err) { console.error('Add ice candidate error:', err); }
+      } else {
+        pendingCandidates.current.push(iceCandidate);
+      }
+    };
+
+    const handleRemoteEnd = () => { cleanup(); onEnd(); };
+
+    socket.on('call_answered', handleAnswer);
+    socket.on('ice_candidate', handleCandidate);
+    socket.on('call_ended', handleRemoteEnd);
+    socket.on('call_rejected', handleRemoteEnd);
+
+    const initCall = async () => {
       try {
         // [Fix] Handle cases where camera might be missing or blocked
         const constraints = {
@@ -88,84 +126,78 @@ export function useWebRTC({ targetUserId, isIncoming, initialOffer, type, onEnd 
           setIsCameraOff(true);
         }
 
+        
+        if (!isMounted) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+
+        localStreamRef.current = stream;
         setLocalStream(stream);
         setCallStatus('ringing');
 
-        // Fetch ICE Servers from backend (Secure Metered.ca integration)
-        let iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
-        try {
-          const iceRes = await api.get('/management/ice-servers');
-          iceServers = iceRes.data;
-        } catch (iceErr) {
-          console.warn('WebRTC: Could not fetch ICE servers, using fallback STUN');
-        }
+        const pc = new RTCPeerConnection({ iceServers });
+        peerConnection.current = pc;
 
-        const pc = await setupPeerConnection(stream, iceServers);
-        isInitialized = true;
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        pc.ontrack = (event) => {
+          setRemoteStream(prev => {
+            if (prev) {
+              const newStream = new MediaStream(prev.getTracks());
+              newStream.addTrack(event.track);
+              return newStream;
+            }
+            return new MediaStream([event.track]);
+          });
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit('ice_candidate', { to: targetUserId, candidate: event.candidate });
+          }
+        };
+
+        pc.onconnectionstatechange = () => {
+          if (pc.connectionState === 'connected') setCallStatus('active');
+          if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+            cleanup();
+            onEnd();
+          }
+        };
 
         if (isIncoming && initialOffer) {
           await pc.setRemoteDescription(new RTCSessionDescription(initialOffer));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          socket?.emit('answer_call', { to: targetUserId, answer });
-          setCallStatus('active');
+          socket.emit('answer_call', { to: targetUserId, answer });
+          
+          while (pendingCandidates.current.length > 0) {
+            const candidate = pendingCandidates.current.shift();
+            if (candidate) await pc.addIceCandidate(candidate);
+          }
         } else {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          socket?.emit('call_user', { to: targetUserId, offer, type });
+          socket.emit('call_user', { to: targetUserId, offer, type });
         }
       } catch (err) {
-        console.error('WebRTC: Failed to initialize call:', err);
-        onEnd();
+        console.error('WebRTC init error:', err);
+        if (isMounted) { cleanup(); onEnd(); }
       }
     };
 
-    init();
-
-    const handleAnswer = async ({ answer }: { answer: any }) => {
-      if (peerConnection.current && peerConnection.current.signalingState !== 'stable') {
-        try {
-          await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
-          setCallStatus('active');
-        } catch (err) {
-          console.error('WebRTC: Error setting remote answer:', err);
-        }
-      }
-    };
-
-    const handleCandidate = async ({ candidate }: { candidate: any }) => {
-      if (peerConnection.current && peerConnection.current.remoteDescription) {
-        try {
-          await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (err) {
-          console.error('WebRTC: Error adding ICE candidate:', err);
-        }
-      }
-    };
-
-    const handleEndCall = () => {
-      cleanup();
-      onEnd();
-    };
-
-    const handleRejected = () => {
-      cleanup();
-      onEnd();
-    };
-
-    socket?.on('call_answered', handleAnswer);
-    socket?.on('ice_candidate', handleCandidate);
-    socket?.on('call_ended', handleEndCall);
-    socket?.on('call_rejected', handleRejected);
+    initCall();
 
     return () => {
-      socket?.off('call_answered', handleAnswer);
-      socket?.off('ice_candidate', handleCandidate);
-      socket?.off('call_ended', handleEndCall);
-      socket?.off('call_rejected', handleRejected);
+      isMounted = false;
+      socket.off('call_answered', handleAnswer);
+      socket.off('ice_candidate', handleCandidate);
+      socket.off('call_ended', handleRemoteEnd);
+      socket.off('call_rejected', handleRemoteEnd);
       cleanup();
     };
-  }, [socket, targetUserId, isIncoming, initialOffer, type, setupPeerConnection, onEnd]);
+  }, [iceServers, socket, targetUserId, isIncoming, type]); // Minimal stable dependencies
 
   const toggleMute = () => {
     if (localStream) {

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
+import gsap from 'gsap';
 import { formatMessageTime } from '../../../shared/utils/formatTime';
 import { Message } from '../../../types/chat';
+import Avatar from '../../../shared/components/Avatar';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
@@ -35,217 +37,225 @@ export default function MessageBubble({
   onReaction,
   onForward,
   onMediaClick,
-  highlight
+  highlight,
 }: MessageBubbleProps) {
   const [showMenu, setShowMenu] = useState(false);
+  const [showReactionStrip, setShowReactionStrip] = useState(false);
+  const bubbleRef = useRef<HTMLDivElement>(null);
 
-  const handleReactionClick = (emoji: string) => {
-    onReaction?.(message, emoji);
+  const isOnlyEmojis = (text: string): number | false => {
+    if (!text) return false;
+    const emojiRegex =
+      /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])+(\ufe0f|\u200d)?$/u;
+    const cleanText = text.replace(/\s/g, '');
+    if (!emojiRegex.test(cleanText)) return false;
+    const count = [...cleanText].length;
+    return count <= 3 ? count : false;
   };
 
-  const VITE_BASEURL = import.meta.env.VITE_BASEURL as string;
-  const MEDIA_BASE = VITE_BASEURL && VITE_BASEURL.startsWith('http') ? new URL(VITE_BASEURL).origin : '';
+  const emojiCount = message.content ? isOnlyEmojis(message.content) : false;
+  const isImageOnly = message.message_type === 'image' && !message.content;
 
-  // Group reactions by emoji
-  const reactionGroups = message.reactions?.reduce((acc: any, r: any) => {
-    acc[r.reaction] = (acc[r.reaction] || 0) + 1;
-    return acc;
-  }, {});
+  useLayoutEffect(() => {
+    if (bubbleRef.current) {
+      gsap.from(bubbleRef.current, {
+        scale: 0.95,
+        opacity: 0,
+        duration: 0.2,
+        ease: 'power2.out',
+        clearProps: 'all',
+      });
+    }
+  }, []);
 
-  const highlightText = (text: string, highlight?: string) => {
-    if (!highlight || !highlight.trim()) return text;
-    const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+  const reactionGroups = message.reactions?.reduce(
+    (acc: Record<string, number>, r: any) => {
+      acc[r.reaction] = (acc[r.reaction] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
+  const hasReactions = reactionGroups && Object.keys(reactionGroups).length > 0;
+
+  const highlightText = (text: string, hl?: string) => {
+    if (!hl || !hl.trim()) return <>{text}</>;
+    const parts = text.split(new RegExp(`(${hl})`, 'gi'));
     return (
-      <span>
+      <>
         {parts.map((part, i) =>
-          part.toLowerCase() === highlight.toLowerCase() ? (
-            <mark key={i} className="bg-[var(--teal)] text-white rounded-sm px-0.5">{part}</mark>
+          part.toLowerCase() === hl.toLowerCase() ? (
+            <mark key={i} className="bg-yellow-400 text-black rounded-sm px-0.5">
+              {part}
+            </mark>
           ) : (
             part
           )
         )}
-      </span>
+      </>
     );
   };
 
   return (
-    <div className={`flex message-bubble group ${isOwn ? 'justify-end' : 'justify-start'} px-3 py-0.5`}>
-      <div className="relative max-w-[68%] min-w-[120px]">
-
-        {/* Action Menu Trigger (Three dots) */}
-        {!message.is_deleted && (
-          <div className={`absolute top-0 ${isOwn ? 'right-full mr-1' : 'left-full ml-1'} opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
-            <div className="relative">
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="p-1 rounded-full hover:bg-[var(--hover)] text-[var(--subtext)]"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-                </svg>
-              </button>
-              {showMenu && (
-                <div 
-                  className={`absolute top-full ${isOwn ? 'right-0' : 'left-0'} mt-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg shadow-xl py-1 z-20 min-w-[100px]`}
-                  onMouseLeave={() => setShowMenu(false)}
-                >
-                  <button onClick={() => { onReply?.(message); setShowMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)]" style={{ color: 'var(--text)' }}>Reply</button>
-                  {isOwn && (
-                    <>
-                      <button onClick={() => { onEdit?.(message); setShowMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)]" style={{ color: 'var(--text)' }}>Edit</button>
-                      <button onClick={() => { onDelete?.(message); setShowMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-red-500">Delete</button>
-                    </>
-                  )}
-                  <button onClick={() => { onForward?.(message); setShowMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)]" style={{ color: 'var(--text)' }}>Forward</button>
-                </div>
-              )}
-            </div>
+    <div className={`message-row ${isOwn ? 'justify-end' : 'justify-start'}`}>
+      <div className={`flex gap-3 max-w-[90%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+        {!isOwn && (
+          <div className="mt-6 flex-shrink-0">
+            <Avatar name={message.sender_username} color={message.sender_avatar_color} size="md" />
           </div>
         )}
 
-        {/* Reaction hover strip */}
-        {!message.is_deleted && (
-          <div
-            className={`reaction-strip absolute ${isOwn ? 'right-full mr-8' : 'left-full ml-8'} top-1/2 -translate-y-1/2
-              flex items-center gap-0.5 bg-[var(--panel)] border border-[var(--border)] rounded-full px-2 py-1 shadow-md z-10`}
-          >
-            {REACTIONS.map(r => (
-              <button
-                key={r}
-                onClick={() => handleReactionClick(r)}
-                className="text-sm hover:scale-125 transition-transform duration-100 cursor-pointer"
-                title={`React with ${r}`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Bubble */}
-        <div className={isOwn ? 'bubble-sent' : 'bubble-received'} style={{ padding: '6px 10px 4px' }}>
-          {/* Group sender name */}
-          {showSender && !isOwn && (
-            <p
-              className="text-xs font-semibold mb-1 truncate"
-              style={{ color: message.sender_avatar_color || 'var(--teal)' }}
-            >
-              {message.sender_username}
-            </p>
-          )}
-
-          {/* Quoted Message */}
-          {message.replied_to_id && !message.is_deleted && (
-            <div className="mb-2 p-2 rounded bg-[var(--bg)] border-l-4 border-[var(--teal)] opacity-80 text-[11px]">
-              <p className="font-bold mb-0.5" style={{ color: 'var(--teal)' }}>
-                {message.parent_message_sender || 'User'}
-              </p>
-              <p className="truncate" style={{ color: 'var(--subtext)' }}>
-                {message.parent_message_content}
-              </p>
-            </div>
-          )}
-
-          {/* Message Content */}
-          <div className="flex flex-col">
-            {message.is_deleted ? (
-               <p className="text-sm italic opacity-60" style={{ color: 'var(--text)' }}>
-                  🚫 This message was deleted
-               </p>
-            ) : (
-              <>
-                {/* Image Rendering */}
-                {message.message_type === 'image' && message.media_url && (
-                  <div 
-                    onClick={() => onMediaClick?.(message.media_url!, 'image')}
-                    className="mb-2 overflow-hidden rounded-lg cursor-pointer bg-[var(--bg)] border border-[var(--border)] max-w-full"
-                  >
-                    <img 
-                      src={message.media_thumbnail_url || message.media_url} 
-                      alt="Shared media"
-                      className="w-full h-auto object-cover max-h-[300px] hover:opacity-90 transition-opacity"
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-
-                {message.message_type === 'file' && message.media_url && (
-                  <div 
-                    onClick={() => onMediaClick?.(message.media_url!, 'document')}
-                    className="flex items-center gap-3 p-3 mb-2 rounded-lg bg-[var(--bg)] hover:bg-[var(--hover)] transition-colors border border-[var(--border)] cursor-pointer"
-                  >
-                    <div className="w-10 h-10 rounded bg-[var(--teal)] flex items-center justify-center flex-shrink-0 text-white shadow-sm">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
-                        {message.media_filename || 'Attachment'}
-                      </p>
-                      <p className="text-[10px]" style={{ color: 'var(--subtext)' }}>
-                        {formatFileSize(message.media_size_bytes)}
-                      </p>
-                    </div>
-                    <svg className="w-4 h-4 text-[var(--subtext)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  </div>
-                )}
-
-                {/* Text Content */}
-                {message.content && (
-                  <p className="text-sm leading-relaxed break-words" style={{ color: 'var(--text)' }}>
-                    {highlightText(message.content, highlight)}
-                  </p>
-                )}
-              </>
+        <div className={`flex flex-col min-w-0 ${isOwn ? 'items-end' : 'items-start'}`}>
+          <div className={`flex items-center gap-2 mb-1 px-1 w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
+            {!isOwn && (
+              <span className="text-[12px] font-bold tracking-tight" style={{ color: 'var(--teal)' }}>
+                {message.sender_username}
+              </span>
             )}
-            
-            {/* Reactions summary */}
-            {reactionGroups && Object.keys(reactionGroups).length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {Object.entries(reactionGroups).map(([emoji, count]: [string, any]) => (
-                  <div 
-                    key={emoji} 
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--border)] text-[10px]"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <span>{emoji}</span>
-                    <span className="font-bold opacity-70">{count > 1 ? count : ''}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Timestamp + read receipt */}
-          <div className="flex items-center gap-1 mt-1 justify-end">
-            {message.is_edited && !message.is_deleted && (
-              <span className="text-[9px] italic" style={{ color: 'var(--subtext)' }}>edited</span>
-            )}
-            <span className="text-[10px]" style={{ color: 'var(--subtext)' }}>
+            <span className="text-[11px] font-medium opacity-60 flex-shrink-0" style={{ color: 'var(--text)' }}>
               {formatMessageTime(message.created_at)}
             </span>
-            {isOwn && (
-              <span className="flex-shrink-0 flex items-center">
-                {message.is_read ? (
-                  /* Double Tick - Blue (Read) */
-                  <svg className="w-[15px] h-[15px]" style={{ color: '#53BDEB' }} fill="currentColor" viewBox="0 0 16 15">
-                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.503zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" />
-                  </svg>
-                ) : message.is_delivered ? (
-                  /* Double Tick - Grey (Delivered) */
-                  <svg className="w-[15px] h-[15px]" style={{ color: 'var(--subtext)' }} fill="currentColor" viewBox="0 0 16 15">
-                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.503zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" />
-                  </svg>
-                ) : (
-                  /* Single Tick - Grey (Sent) */
-                  <svg className="w-[14px] h-[14px]" style={{ color: 'var(--subtext)' }} fill="currentColor" viewBox="0 0 16 15">
-                    <path d="M10.91 3.316l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" />
-                  </svg>
+          </div>
+          
+          <div className="relative group max-w-full">
+            {!message.is_deleted && (
+              <div
+                className={`
+                  absolute top-0 z-20 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150
+                  ${isOwn ? 'right-[calc(100%+12px)]' : 'left-[calc(100%+12px)]'}
+                `}
+              >
+                <div className="flex items-center gap-1 rounded-lg px-2 py-1 shadow-md bg-white border border-gray-200">
+                  {REACTIONS.map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => onReaction?.(message, r)}
+                      className="text-[18px] leading-none hover:scale-125 transition-transform duration-100"
+                    >
+                      {r}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setShowMenu((v) => !v)}
+                    className="p-1 rounded-md hover:bg-gray-100 ml-1 text-gray-500"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                    </svg>
+                  </button>
+                </div>
+
+                {showMenu && (
+                  <div
+                    className={`absolute top-full mt-1 ${isOwn ? 'right-0' : 'left-0'} rounded-lg shadow-xl py-1 z-30`}
+                    style={{ background: 'var(--panel)', border: '1px solid var(--border)', minWidth: 140 }}
+                    onMouseLeave={() => setShowMenu(false)}
+                  >
+                    <button onClick={() => { onReply?.(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 text-[13px] hover:bg-[var(--hover)]" style={{ color: 'var(--text)' }}>Reply</button>
+                    {isOwn && (
+                      <>
+                        <button onClick={() => { onEdit?.(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 text-[13px] hover:bg-[var(--hover)]" style={{ color: 'var(--text)' }}>Edit</button>
+                        <button onClick={() => { onDelete?.(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 text-[13px] hover:bg-[var(--hover)] text-red-500">Delete</button>
+                      </>
+                    )}
+                    <button onClick={() => { onForward?.(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 text-[13px] hover:bg-[var(--hover)]" style={{ color: 'var(--text)' }}>Forward</button>
+                  </div>
                 )}
-              </span>
+              </div>
+            )}
+
+            <div
+              ref={bubbleRef}
+              className={`bubble-base ${isOwn ? 'bubble-sent' : 'bubble-received'} ${emojiCount ? 'text-[32px]' : ''}`}
+              style={{ 
+                padding: isImageOnly ? '4px' : undefined,
+                marginBottom: hasReactions ? '14px' : '0'
+              }}
+            >
+              {message.replied_to_id && !message.is_deleted && (
+                <div className="flex overflow-hidden mb-2 shadow-sm border-l-[3px] rounded-sm bg-black/5 border-[var(--teal)]">
+                  <div className="px-3 py-1.5 min-w-0">
+                    <p className="text-[11px] font-bold leading-tight mb-0.5" style={{ color: 'var(--teal)' }}>
+                      {message.parent_message_sender || 'User'}
+                    </p>
+                    <p className="text-[11px] truncate leading-tight opacity-70" style={{ color: 'var(--text)' }}>
+                      {message.parent_message_content}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {message.is_deleted ? (
+                <p className="text-[13.5px] italic opacity-50">🚫 This message was deleted</p>
+              ) : (
+                <>
+                  {message.message_type === 'image' && message.media_url && (
+                    <div
+                      onClick={() => onMediaClick?.(message.media_url!, 'image')}
+                      className={`overflow-hidden cursor-pointer relative ${message.content ? 'mb-2' : ''}`}
+                      style={{ borderRadius: 4, maxWidth: 400 }}
+                    >
+                      <img
+                        src={message.media_thumbnail_url || message.media_url}
+                        alt="Shared media"
+                        className="w-full h-auto max-h-[500px] object-cover block"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+
+                  {message.message_type === 'file' && message.media_url && (
+                    <div
+                      onClick={() => onMediaClick?.(message.media_url!, 'document')}
+                      className="flex items-center gap-4 mb-1 cursor-pointer hover:bg-black/5 transition-colors p-3 rounded bg-black/5"
+                    >
+                      <div className="flex items-center justify-center flex-shrink-0 shadow-sm bg-[var(--teal)] w-10 h-10 rounded">
+                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-bold truncate">{message.media_filename || 'Attachment'}</p>
+                        <p className="text-[11px] opacity-60">{formatFileSize(message.media_size_bytes)}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {message.content && (
+                    <p className={`text-[15px] leading-[1.5] break-words whitespace-pre-wrap`}>
+                      {highlightText(message.content, highlight)}
+                      {message.is_edited && !message.is_deleted && (
+                        <span className="text-[11px] italic opacity-50 ml-2">(edited)</span>
+                      )}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
+            {hasReactions && (
+              <>
+                <div className={`reaction-pill-teams ${isOwn ? 'own' : 'received'}`}>
+                  {Object.entries(reactionGroups!).map(([emoji, count]: [string, any]) => (
+                    <div key={emoji} className="flex items-center gap-1 py-1 text-[15px] leading-none">
+                      <span>{emoji}</span>
+                      <span className="text-[11px] font-bold text-gray-600">{count}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* <button 
+                  className={`add-reaction-btn ${isOwn ? 'own' : 'received'}`}
+                  title="Add reaction"
+                  onClick={() => setShowReactionStrip(true)}
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+                    <circle cx="18" cy="18" r="4" fill="white" stroke="#6264a7" strokeWidth="1.5"/>
+                    <line x1="18" y1="16.5" x2="18" y2="19.5" stroke="#6264a7" strokeWidth="1.5"/>
+                    <line x1="16.5" y1="18" x2="19.5" y2="18" stroke="#6264a7" strokeWidth="1.5"/>
+                  </svg>
+                </button> */}
+              </>
             )}
           </div>
         </div>

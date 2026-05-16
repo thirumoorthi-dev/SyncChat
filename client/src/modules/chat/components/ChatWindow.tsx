@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import gsap from 'gsap';
 import { useAppSelector } from '../../../app/hooks';
 import { useSocket } from '../../../context/SocketContext';
 import MessageBubble from './MessageBubble';
@@ -81,10 +82,13 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
   const isTypingRef = useRef<boolean>(false);
   const prevScrollHeightRef = useRef<number>(0);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const attachmentMenuRef = useRef<HTMLDivElement>(null);
 
   const isGroup = chat.type === 'group';
   const name = isGroup ? (chatInfo as any).name : (chatInfo as any).display_name || (chatInfo as any).username;
-  const subtitle = isGroup ? `${(chatInfo as any).member_count || 0} members` : formatLastSeen((chatInfo as any).last_seen, (chatInfo as any).is_online);
+  const subtitle = isGroup 
+    ? `${(chatInfo as any).member_count || (chatInfo as any).members?.length || 0} members` 
+    : formatLastSeen((chatInfo as any).last_seen, (chatInfo as any).is_online);
   const isArchived = (chat as any).is_archived;
   const isBlocked = (chat as any).is_blocked;
 
@@ -151,15 +155,34 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
     scrollToBottom('auto');
   }, [messages, typing]);
 
+  useLayoutEffect(() => {
+    if (showEmojiPicker && emojiPickerRef.current) {
+      gsap.fromTo(emojiPickerRef.current, 
+        { opacity: 0, y: 20, scale: 0.9, transformOrigin: 'bottom left' },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.7)' }
+      );
+    }
+  }, [showEmojiPicker]);
+
+  useLayoutEffect(() => {
+    if (showAttachmentMenu && attachmentMenuRef.current) {
+      gsap.fromTo(attachmentMenuRef.current, 
+        { opacity: 0, y: 20, scale: 0.9, transformOrigin: 'bottom left' },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.7)' }
+      );
+    }
+  }, [showAttachmentMenu]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
         setShowEmojiPicker(false);
       }
       // Close attachment menu if clicked outside
-      // We check if it's not the plus button itself
+      // We check if it's not the plus button itself and not within the menu
       const plusBtn = document.querySelector('[data-plus-btn]');
-      if (showAttachmentMenu && plusBtn && !plusBtn.contains(event.target as Node)) {
+      const isInsideMenu = attachmentMenuRef.current?.contains(event.target as Node);
+      if (showAttachmentMenu && plusBtn && !plusBtn.contains(event.target as Node) && !isInsideMenu) {
         setShowAttachmentMenu(false);
       }
     };
@@ -517,7 +540,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
       {/* ── Header ── */}
       <div
         className="flex items-center gap-3 px-4 py-3 flex-shrink-0 shadow-sm z-20"
-        style={{ backgroundColor: 'var(--panel)', borderBottom: '1px solid var(--border)' }}
+        style={{ backgroundColor: 'var(--header)', borderBottom: '1px solid var(--border)' }}
       >
         <button
           onClick={onBack}
@@ -531,13 +554,13 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
 
         <Avatar name={name} color={chatInfo.avatar_color} size="md" />
 
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowInfo(!showInfo)}>
-          <h2 className="font-semibold text-sm leading-tight truncate" style={{ color: 'var(--text)' }}>
+        <div className="flex-1 min-w-0 cursor-pointer group" onClick={() => setShowInfo(!showInfo)}>
+          <h2 className="font-bold text-[15px] tracking-tight leading-tight group-hover:text-[var(--teal)] transition-colors" style={{ color: 'var(--text)' }}>
             {name}
           </h2>
-          <p className="text-xs truncate" style={{ color: (chatInfo as any).is_online && !isGroup ? 'var(--teal)' : 'var(--subtext)' }}>
+          <p className="text-[11px] font-medium truncate" style={{ color: (chatInfo as any).is_online && !isGroup ? 'var(--teal)' : 'var(--subtext)' }}>
             {typing ? (
-              <span style={{ color: 'var(--teal)' }}>
+              <span className="animate-pulse" style={{ color: 'var(--teal)' }}>
                 {isGroup ? `${typing.username} is typing…` : 'typing…'}
               </span>
             ) : subtitle}
@@ -570,13 +593,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
             </>
           )}
           <button
-            onClick={() => {
-              setIsSearching(!isSearching);
-              if (isSearching) {
-                setSearchQuery('');
-                setSearchResults([]);
-              }
-            }}
+            onClick={() => setIsSearching(!isSearching)}
             className="p-2 rounded-full hover:bg-[var(--hover)] transition-colors"
             style={{ color: isSearching ? 'var(--teal)' : 'var(--subtext)' }}
           >
@@ -674,19 +691,26 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                   </div>
                 ) : (
                   <>
-                    {messageRows.map((row) => {
+                    {messageRows.map((row, idx) => {
                       if (row.type === 'separator') {
                         return (
-                          <div key={row.id} className="date-sep">
-                            <span className="bg-[var(--panel)] px-3 py-0.5 rounded-full text-[10px]" style={{ color: 'var(--subtext)' }}>
+                          <div key={row.id} className="date-sep my-4">
+                            <span className="bg-[var(--panel)] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-[var(--border)]" style={{ color: 'var(--subtext)' }}>
                               {row.label}
                             </span>
                           </div>
                         );
                       }
                       const { msg, showSender } = row;
+                      const prevMsg = idx > 0 && messageRows[idx - 1].type === 'message' ? messageRows[idx - 1].msg : null;
+                      const isNewGroup = !prevMsg || prevMsg.sender_id !== msg.sender_id;
+
                       return (
-                        <div key={msg.id} id={`msg-${msg.id}`}>
+                        <div 
+                          key={msg.id} 
+                          id={`msg-${msg.id}`}
+                          className={isNewGroup ? 'mt-4' : 'mt-1'}
+                        >
                           <MessageBubble
                             message={msg}
                             isOwn={msg.sender_id === (user as User).id}
@@ -778,7 +802,11 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                 </div>
               )}
 
-              <div className="flex items-end gap-2 px-4 py-3 relative">
+              {/* Input Area */}
+              <div 
+                className="flex items-end gap-2 px-4 py-3 relative"
+                style={{ backgroundColor: 'var(--received)' }}
+              >
                 {showEmojiPicker && (
                   <div ref={emojiPickerRef} className="absolute bottom-full left-4 z-50 mb-2 shadow-2xl">
                     <Picker
@@ -793,7 +821,8 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
 
                 {showAttachmentMenu && (
                   <div
-                    className="absolute bottom-full left-4 z-50 mb-4 bg-[var(--panel)] rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden animate-in slide-in-from-bottom-4 duration-200"
+                    ref={attachmentMenuRef}
+                    className="absolute bottom-full left-4 z-50 mb-4 bg-[var(--panel)] rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden"
                     style={{ width: '220px' }}
                   >
                     <div className="p-2 flex flex-col gap-1">
@@ -849,7 +878,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                 )}
 
                 <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileSelect} accept={fileAccept} />
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     data-plus-btn
                     onClick={() => {
@@ -857,14 +886,14 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                       setShowEmojiPicker(false);
                     }}
                     disabled={uploading}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 disabled:opacity-50 ${showAttachmentMenu ? 'bg-[var(--teal)] text-white rotate-45' : 'hover:bg-[var(--hover)]'}`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 flex-shrink-0 disabled:opacity-50 ${showAttachmentMenu ? 'bg-[var(--teal)] text-white rotate-45 shadow-lg shadow-teal-500/30' : 'hover:bg-[var(--hover)]'}`}
                     style={{ color: showAttachmentMenu ? '#fff' : 'var(--subtext)' }}
                   >
                     {uploading ? (
                       <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 4v16m8-8H4" />
                       </svg>
                     )}
                   </button>
@@ -873,7 +902,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                       setShowEmojiPicker(!showEmojiPicker);
                       setShowAttachmentMenu(false);
                     }}
-                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--hover)] transition-colors flex-shrink-0"
+                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--hover)] transition-all duration-200 flex-shrink-0"
                     style={{ color: showEmojiPicker ? 'var(--teal)' : 'var(--subtext)' }}
                   >
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -882,7 +911,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                   </button>
                 </div>
                 <div
-                  className="flex-1 flex items-end gap-2 rounded-2xl px-4 py-2"
+                  className="flex-1 flex items-end gap-2 rounded-2xl px-4 py-2 transition-all duration-200 focus-within:shadow-inner"
                   style={{ backgroundColor: 'var(--input-bg)', border: '1px solid var(--border)' }}
                 >
                   <textarea
@@ -895,29 +924,27 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                         sendMessage();
                       }
                     }}
-                    placeholder="Type a message"
+                    placeholder="Type a message..."
                     rows={1}
-                    className="flex-1 outline-none text-sm resize-none max-h-32 overflow-y-auto bg-transparent leading-relaxed"
+                    className="flex-1 outline-none text-[14.5px] resize-none max-h-32 overflow-y-auto bg-transparent leading-relaxed"
                     style={{ color: 'var(--text)', lineHeight: '1.5' }}
                   />
                 </div>
 
-                <button
+                 <button
                   id="send-btn"
-                  onClick={() => sendMessage()}
-                  disabled={!input.trim()}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 ${input.trim() ? 'scale-100 shadow-md' : 'scale-95 opacity-80'
-                    }`}
-                  style={{
-                    background: input.trim()
-                      ? 'linear-gradient(135deg, var(--teal), var(--dark))'
-                      : 'var(--border)',
-                    color: input.trim() ? '#fff' : 'var(--subtext)',
-                  }}
+                  onClick={() => input.trim() ? sendMessage() : null}
+                  className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 flex-shrink-0 ${input.trim() ? 'bg-[var(--teal)] text-white shadow-lg shadow-teal-500/20 scale-100' : 'text-[var(--subtext)] hover:bg-[var(--hover)]'}`}
                 >
-                  <svg className="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                  </svg>
+                  {input.trim() ? (
+                    <svg className="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>

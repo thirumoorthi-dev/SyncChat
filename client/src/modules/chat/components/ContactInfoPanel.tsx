@@ -13,24 +13,36 @@ interface ContactInfoPanelProps {
 
 export default function ContactInfoPanel({ chat, onClose, onBlock, onArchive, onMediaClick }: ContactInfoPanelProps) {
   const [media, setMedia] = useState<Message[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const isGroup = chat.type === 'group';
 
   useEffect(() => {
-    const fetchMedia = async () => {
+    const fetchData = async () => {
+      setLoading(true);
       try {
-        const res = await api.get(`/messages/media/${chat.id}`, {
-          params: { isGroup }
-        });
-        setMedia(res.data);
+        const mediaPromise = api.get(`/messages/media/${chat.id}`, { params: { isGroup } });
+        const dataPromises: any[] = [mediaPromise];
+        
+        if (isGroup) {
+          dataPromises.push(api.get(`/groups/${chat.id}`));
+        }
+        
+        const results = await Promise.all(dataPromises);
+        setMedia(results[0].data);
+        
+        if (isGroup && results[1]) {
+          setMembers(results[1].data.members || []);
+        }
       } catch (err) {
-        console.error('Fetch media error:', err);
+        console.error('Fetch data error:', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchMedia();
+    fetchData();
   }, [chat.id, isGroup]);
+
 
   const name = isGroup ? chat.name : (chat.display_name || chat.username);
 
@@ -66,7 +78,37 @@ export default function ContactInfoPanel({ chat, onClose, onBlock, onArchive, on
           </p>
         </div>
 
+        {/* Members Section (for Groups) */}
+        {isGroup && (
+          <div className="p-6 bg-[var(--bg)] mb-2 shadow-sm">
+            <h4 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--teal)' }}>
+              Members ({members.length})
+            </h4>
+            <div className="flex flex-col gap-4">
+              {members.map((member) => (
+                <div key={member.id} className="flex items-center gap-3">
+                  <Avatar name={member.display_name || member.username} color={member.avatar_color} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
+                      {member.display_name || member.username}
+                      {member.id === (chat as any).creator_id && (
+                        <span className="ml-2 text-[10px] bg-[var(--hover)] px-1.5 py-0.5 rounded text-[var(--teal)] font-bold">
+                          Group Admin
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] opacity-60 truncate" style={{ color: 'var(--text)' }}>
+                      @{member.username}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Shared Media */}
+
         <div className="p-6 bg-[var(--bg)] mb-2 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--teal)' }}>Shared Media</h4>

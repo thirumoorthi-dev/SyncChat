@@ -14,6 +14,7 @@ interface ConversationItemProps {
   onBlock?: () => void;
   isBlocked?: boolean;
   onUnblock?: () => void;
+  onLeave?: () => void;
 }
 
 export default function ConversationItem({ 
@@ -27,6 +28,7 @@ export default function ConversationItem({
   onBlock ,
   isBlocked,
   onUnblock,
+  onLeave,
 }: ConversationItemProps) {
   const [showMenu, setShowMenu] = useState(false);
   const name = chat.type === 'group' ? chat.name : (chat.display_name || chat.username || '?');
@@ -47,18 +49,29 @@ export default function ConversationItem({
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
       className={`
         slide-item group relative flex items-center gap-3 px-4 py-3 cursor-pointer
-        transition-colors duration-150
+        transition-all duration-200 border-b border-[var(--border)]
         ${isActive
-          ? 'bg-[var(--active-bg)] border-l-[3px] border-[var(--active-bar)]'
-          : 'hover:bg-[var(--hover)] border-l-[3px] border-transparent'}
+          ? 'bg-[var(--active-bg)] shadow-sm'
+          : 'hover:bg-[var(--hover)]'}
       `}
     >
+      {isActive && (
+        <div 
+          className="absolute left-0 top-0 bottom-0 w-[3px] bg-[var(--active-bar)]" 
+          style={{ transition: 'height 0.3s ease' }} 
+        />
+      )}
       {/* Avatar */}
-      <Avatar
-        name={name}
-        color={chat.avatar_color}
-        size="md"
-      />
+      <div className="relative flex-shrink-0">
+        <Avatar
+          name={name}
+          color={chat.avatar_color}
+          size="md"
+        />
+        {chat.type === 'direct' && (chat as any).is_online && (
+          <span className="absolute bottom-0 right-0 w-3 h-3 bg-[var(--green)] border-2 border-[var(--panel)] rounded-full pulse-ring" />
+        )}
+      </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
@@ -107,19 +120,29 @@ export default function ConversationItem({
                         📁 Archive
                       </button>
                     )}
-                    {isBlocked ? (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); onUnblock?.(); setShowMenu(false); }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-green-500"
-                      >
-                        ✅ Unblock User
-                      </button>
+                    
+                    {!isGroup ? (
+                      isBlocked ? (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onUnblock?.(); setShowMenu(false); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-green-500"
+                        >
+                          ✅ Unblock User
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onBlock?.(); setShowMenu(false); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-red-500"
+                        >
+                          🚫 Block User
+                        </button>
+                      )
                     ) : (
                       <button 
-                        onClick={(e) => { e.stopPropagation(); onBlock?.(); setShowMenu(false); }}
+                        onClick={(e) => { e.stopPropagation(); onLeave?.(); setShowMenu(false); }}
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--hover)] text-red-500"
                       >
-                        🚫 Block User
+                        🚪 Leave Group
                       </button>
                     )}
                   </div>

@@ -5,6 +5,7 @@ import MessageModel from '../models/message.model.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { groupSchemas, messageSchemas } from '../validations/schemas.js';
+import { getIO, onlineUsers } from '../socket/socketHandler.js';
 
 /**
  * @swagger
@@ -47,6 +48,21 @@ router.post('/', authenticateToken, validate({ body: groupSchemas.create }), asy
     const membersResult = await GroupModel.getGroupMembers(group.id);
 
     res.status(201).json({ ...group, members: membersResult.rows });
+
+    // Notify members via socket
+    const io = getIO();
+    if (io) {
+      const fullGroup = { ...group, members: membersResult.rows, type: 'group' };
+      memberIds.forEach((id: string) => {
+        const sid = onlineUsers.get(id);
+        if (sid) {
+          io.to(sid).emit('new_group', fullGroup);
+        }
+      });
+      // Also notify creator (who is already in memberIds usually, but just in case)
+      const creatorSid = onlineUsers.get(req.user.id);
+      if (creatorSid) io.to(creatorSid).emit('new_group', fullGroup);
+    }
   } catch (error) {
     console.error('Create group error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -239,6 +255,42 @@ router.post('/:groupId/members',
     res.json({ message: 'Member added successfully' });
   } catch (error) {
     console.error('Add member error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/groups/{groupId}/leave:
+ *   post:
+ *     summary: Leave a group
+ *     tags: [Groups]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: Left group successfully }
+ */
+router.post('/:groupId/leave', 
+  authenticateToken, 
+  validate({ params: groupSchemas.groupIdParam }),
+  async (req: any, res: Response) => {
+    const { groupId } = req.params;
+
+  try {
+    const member = await GroupModel.checkMembership(groupId, req.user.id);
+    if (member.rows.length === 0) {
+      return res.status(403).json({ message: 'Not a member of this group' });
+    }
+
+    await GroupModel.removeMember(groupId, req.user.id);
+    res.json({ message: 'Left group successfully' });
+  } catch (error) {
+    console.error('Leave group error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
