@@ -57,7 +57,11 @@ export default function CallModal({ targetUser, isIncoming, initialOffer, type, 
         {/* Remote Video (Background) */}
         {type === 'video' && remoteStream && (
           <video
-            ref={remoteVideoRef}
+            ref={(el) => {
+              if (el && remoteStream) {
+                el.srcObject = remoteStream;
+              }
+            }}
             autoPlay
             playsInline
             className="absolute inset-0 w-full h-full object-cover"

@@ -86,7 +86,9 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
 
   const isGroup = chat.type === 'group';
   const name = isGroup ? (chatInfo as any).name : (chatInfo as any).display_name || (chatInfo as any).username;
-  const subtitle = isGroup ? `${(chatInfo as any).member_count || 0} members` : formatLastSeen((chatInfo as any).last_seen, (chatInfo as any).is_online);
+  const subtitle = isGroup 
+    ? `${(chatInfo as any).member_count || (chatInfo as any).members?.length || 0} members` 
+    : formatLastSeen((chatInfo as any).last_seen, (chatInfo as any).is_online);
   const isArchived = (chat as any).is_archived;
   const isBlocked = (chat as any).is_blocked;
 
@@ -552,13 +554,13 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
 
         <Avatar name={name} color={chatInfo.avatar_color} size="md" />
 
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowInfo(!showInfo)}>
-          <h2 className="font-semibold text-sm leading-tight truncate" style={{ color: 'var(--text)' }}>
+        <div className="flex-1 min-w-0 cursor-pointer group" onClick={() => setShowInfo(!showInfo)}>
+          <h2 className="font-bold text-[15px] tracking-tight leading-tight group-hover:text-[var(--teal)] transition-colors" style={{ color: 'var(--text)' }}>
             {name}
           </h2>
-          <p className="text-xs truncate" style={{ color: (chatInfo as any).is_online && !isGroup ? 'var(--teal)' : 'var(--subtext)' }}>
+          <p className="text-[11px] font-medium truncate" style={{ color: (chatInfo as any).is_online && !isGroup ? 'var(--teal)' : 'var(--subtext)' }}>
             {typing ? (
-              <span style={{ color: 'var(--teal)' }}>
+              <span className="animate-pulse" style={{ color: 'var(--teal)' }}>
                 {isGroup ? `${typing.username} is typing…` : 'typing…'}
               </span>
             ) : subtitle}
@@ -689,19 +691,26 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                   </div>
                 ) : (
                   <>
-                    {messageRows.map((row) => {
+                    {messageRows.map((row, idx) => {
                       if (row.type === 'separator') {
                         return (
-                          <div key={row.id} className="date-sep">
-                            <span className="bg-[var(--panel)] px-3 py-0.5 rounded-full text-[10px]" style={{ color: 'var(--subtext)' }}>
+                          <div key={row.id} className="date-sep my-4">
+                            <span className="bg-[var(--panel)] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-[var(--border)]" style={{ color: 'var(--subtext)' }}>
                               {row.label}
                             </span>
                           </div>
                         );
                       }
                       const { msg, showSender } = row;
+                      const prevMsg = idx > 0 && messageRows[idx - 1].type === 'message' ? messageRows[idx - 1].msg : null;
+                      const isNewGroup = !prevMsg || prevMsg.sender_id !== msg.sender_id;
+
                       return (
-                        <div key={msg.id} id={`msg-${msg.id}`}>
+                        <div 
+                          key={msg.id} 
+                          id={`msg-${msg.id}`}
+                          className={isNewGroup ? 'mt-4' : 'mt-1'}
+                        >
                           <MessageBubble
                             message={msg}
                             isOwn={msg.sender_id === (user as User).id}
@@ -869,7 +878,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                 )}
 
                 <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileSelect} accept={fileAccept} />
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     data-plus-btn
                     onClick={() => {
@@ -877,14 +886,14 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                       setShowEmojiPicker(false);
                     }}
                     disabled={uploading}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 disabled:opacity-50 ${showAttachmentMenu ? 'bg-[var(--teal)] text-white rotate-45' : 'hover:bg-[var(--hover)]'}`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 flex-shrink-0 disabled:opacity-50 ${showAttachmentMenu ? 'bg-[var(--teal)] text-white rotate-45 shadow-lg shadow-teal-500/30' : 'hover:bg-[var(--hover)]'}`}
                     style={{ color: showAttachmentMenu ? '#fff' : 'var(--subtext)' }}
                   >
                     {uploading ? (
                       <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 4v16m8-8H4" />
                       </svg>
                     )}
                   </button>
@@ -893,7 +902,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                       setShowEmojiPicker(!showEmojiPicker);
                       setShowAttachmentMenu(false);
                     }}
-                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--hover)] transition-colors flex-shrink-0"
+                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--hover)] transition-all duration-200 flex-shrink-0"
                     style={{ color: showEmojiPicker ? 'var(--teal)' : 'var(--subtext)' }}
                   >
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -902,7 +911,7 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                   </button>
                 </div>
                 <div
-                  className="flex-1 flex items-end gap-2 rounded-2xl px-4 py-2"
+                  className="flex-1 flex items-end gap-2 rounded-2xl px-4 py-2 transition-all duration-200 focus-within:shadow-inner"
                   style={{ backgroundColor: 'var(--input-bg)', border: '1px solid var(--border)' }}
                 >
                   <textarea
@@ -915,9 +924,9 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                         sendMessage();
                       }
                     }}
-                    placeholder="Type a message"
+                    placeholder="Type a message..."
                     rows={1}
-                    className="flex-1 outline-none text-sm resize-none max-h-32 overflow-y-auto bg-transparent leading-relaxed"
+                    className="flex-1 outline-none text-[14.5px] resize-none max-h-32 overflow-y-auto bg-transparent leading-relaxed"
                     style={{ color: 'var(--text)', lineHeight: '1.5' }}
                   />
                 </div>
@@ -925,11 +934,10 @@ export default function ChatWindow({ chat, onBack, onStartCall }: ChatWindowProp
                  <button
                   id="send-btn"
                   onClick={() => input.trim() ? sendMessage() : null}
-                  className="w-11 h-11 flex items-center justify-center transition-all duration-200 flex-shrink-0"
-                  style={{ color: input.trim() ? 'var(--teal)' : 'var(--subtext)' }}
+                  className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 flex-shrink-0 ${input.trim() ? 'bg-[var(--teal)] text-white shadow-lg shadow-teal-500/20 scale-100' : 'text-[var(--subtext)] hover:bg-[var(--hover)]'}`}
                 >
                   {input.trim() ? (
-                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                     </svg>
                   ) : (

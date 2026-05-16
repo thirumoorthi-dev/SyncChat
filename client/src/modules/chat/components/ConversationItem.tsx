@@ -48,19 +48,30 @@ export default function ConversationItem({
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
       className={`
-        slide-item group relative flex items-center gap-3 px-3 py-3 cursor-pointer
-        transition-colors duration-150 border-b border-[var(--border)]
+        slide-item group relative flex items-center gap-3 px-4 py-3 cursor-pointer
+        transition-all duration-200 border-b border-[var(--border)]
         ${isActive
-          ? 'bg-[#2a3942]'
-          : 'hover:bg-[#202c33]'}
+          ? 'bg-[var(--active-bg)] shadow-sm'
+          : 'hover:bg-[var(--hover)]'}
       `}
     >
+      {isActive && (
+        <div 
+          className="absolute left-0 top-0 bottom-0 w-[3px] bg-[var(--active-bar)]" 
+          style={{ transition: 'height 0.3s ease' }} 
+        />
+      )}
       {/* Avatar */}
-      <Avatar
-        name={name}
-        color={chat.avatar_color}
-        size="md"
-      />
+      <div className="relative flex-shrink-0">
+        <Avatar
+          name={name}
+          color={chat.avatar_color}
+          size="md"
+        />
+        {chat.type === 'direct' && (chat as any).is_online && (
+          <span className="absolute bottom-0 right-0 w-3 h-3 bg-[var(--green)] border-2 border-[var(--panel)] rounded-full pulse-ring" />
+        )}
+      </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">

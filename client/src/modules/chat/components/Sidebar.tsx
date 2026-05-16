@@ -310,24 +310,25 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
     <div className="flex flex-col h-full" style={{ background: 'var(--panel)', borderRight: '1px solid var(--border)' }}>
       {/* ── Header ── */}
       <div
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{ backgroundColor: 'var(--header)', borderBottom: '1px solid var(--border)' }}
+        className="flex items-center justify-between px-4 py-4 flex-shrink-0 z-30"
+        style={{ backgroundColor: 'var(--header)', borderBottom: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
       >
         <div className="flex items-center gap-3">
-          <div className="relative">
+          <div className="relative group cursor-pointer" onClick={() => setShowProfile(true)}>
             <Avatar name={user?.username} color={user?.avatar_color} size="md" />
+            <div className="absolute inset-0 rounded-full bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <span
-              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--panel)] ${isConnected ? 'bg-[var(--green)]' : 'bg-gray-400'
-                }`}
+              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[var(--header)] ${isConnected ? 'bg-[var(--green)]' : 'bg-gray-400'
+                } pulse-ring`}
               title={isConnected ? 'Connected' : 'Reconnecting…'}
             />
           </div>
           <div className="hidden sm:block">
-            <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text)' }}>
+            <p className="text-sm font-bold tracking-tight leading-tight" style={{ color: 'var(--text)' }}>
               {user?.username}
             </p>
-            <p className="text-[10px]" style={{ color: isConnected ? 'var(--teal)' : 'var(--subtext)' }}>
-              {isConnected ? 'online' : 'connecting…'}
+            <p className="text-[10px] font-medium" style={{ color: isConnected ? 'var(--teal)' : 'var(--subtext)' }}>
+              {isConnected ? 'Available' : 'Connecting…'}
             </p>
           </div>
         </div>
@@ -395,14 +396,14 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
       </div>
 
       {/* ── Search ── */}
-      <div className="px-3 py-2 flex-shrink-0" style={{ backgroundColor: 'var(--panel)' }}>
-        <div className="relative">
+      <div className="px-4 py-3 flex-shrink-0" style={{ backgroundColor: 'var(--panel)' }}>
+        <div className="relative group">
           <svg
-            className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors group-focus-within:text-[var(--teal)]"
             style={{ color: 'var(--subtext)' }}
             fill="none" viewBox="0 0 24 24" stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             id="sidebar-search"
@@ -410,7 +411,7 @@ export default function Sidebar({ activeChat, onSelectChat }: SidebarProps) {
             placeholder="Search or start new chat"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-xl pl-9 pr-4 py-2 text-sm outline-none transition-colors"
+            className="w-full rounded-2xl pl-10 pr-4 py-2.5 text-[13px] outline-none transition-all duration-200"
             style={{
               background: 'var(--input-bg)',
               color: 'var(--text)',
