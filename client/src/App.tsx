@@ -9,7 +9,6 @@ import { useAppDispatch, useAppSelector } from './app/hooks';
 import { useGetMeQuery } from './modules/auth/api/auth.api';
 import { setUser, setLoading } from './modules/auth/store/auth.slice';
 
-// Apply saved theme on mount (before render)
 const savedTheme = localStorage.getItem('theme');
 if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
   document.documentElement.classList.add('dark');
