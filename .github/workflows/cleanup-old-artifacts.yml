@@ -1,0 +1,46 @@
+name: Cleanup old artifacts
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  remove-old-artifacts:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete all artifacts
+        uses: actions/github-script@v6
+        with:
+          script: |
+            let hasNextPage = true;
+            let page = 1;
+            while (hasNextPage) {
+              const response = await github.rest.actions.listArtifactsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+                page: page
+              });
+              
+              if (response.data.artifacts.length === 0) {
+                hasNextPage = false;
+                break;
+              }
+              
+              for (const artifact of response.data.artifacts) {
+                try {
+                  await github.rest.actions.deleteArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: artifact.id,
+                  });
+                  console.log(`Deleted artifact ${artifact.name} (${artifact.id})`);
+                } catch (error) {
+                  console.error(`Failed to delete artifact ${artifact.id}: ${error.message}`);
+                }
+              }
+              page++;
+            }
