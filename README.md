@@ -269,7 +269,7 @@ This project is licensed under the **MIT License**.
 ---
 
 ## 👨‍💻 Author
-**Thiru** — [@Thiru2115](https://github.com/Thiru2115)
+**Thiru** — [@Thirumoorthi](https://github.com/thirumoorthi-dev)
 
 ---
 
